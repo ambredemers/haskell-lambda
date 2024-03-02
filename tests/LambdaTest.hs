@@ -17,10 +17,26 @@ testi =
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
+testIfTrue :: Test
+testIfTrue =
+    let expected = fvar "x"
+    in let actual = eval (tif ttrue (fvar "x") (fvar "y")) []
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
+
+testIfFalse :: Test
+testIfFalse =
+    let expected = fvar "y"
+    in let actual = eval (tif tfalse (fvar "x") (fvar "y")) []
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
+
 tests = TestList
     [
         TestLabel "testskk" testskk,
-        TestLabel "tessti" testi
+        TestLabel "tessti" testi,
+        TestLabel "testIfTrue" testIfTrue,
+        TestLabel "testIfFalse" testIfFalse
     ]
 
 main = do

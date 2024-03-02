@@ -17,10 +17,12 @@ instance Exception TermException
 
 -- term
 data Term
-    = Fvar { fvarname :: String, fvardbg :: Dbg }
-    | Bvar { bvarindex :: Int, bvardbg :: Dbg }
-    | Abs { absarity :: Int, absbody :: Term, absenv :: [Term], absdbg :: Dbg }
-    | App { appfn :: Term, appargs :: [Term], appdbg :: Dbg }
+    = Fvar { fvarName :: String, fvarDbg :: Dbg }
+    | Bvar { bvarIndex :: Int, barDbg :: Dbg }
+    | Abs { absArity :: Int, absBody :: Term, absEnv :: [Term], absDbg :: Dbg }
+    | App { appFn :: Term, appArgs :: [Term], appDbg :: Dbg }
+    | Tbool { boolValue :: Bool, boolDbg :: Dbg }
+    | Tif { ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg }
     deriving Eq
 
 instance Show Term where
@@ -28,6 +30,9 @@ instance Show Term where
     show (Bvar index _) = "(bvar " ++ show index ++ ")"
     show (Abs arity body _ _) = "(abs " ++ show arity ++ " " ++ show body ++ ")"
     show (App fn args _) = "(app " ++ show fn ++ " " ++ show args ++ ")"
+    show (Tbool True _) = "#true"
+    show (Tbool False _) = "#false"
+    show (Tif cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ show alt ++ ")"
 
 fvar :: String -> Term
 fvar name = Fvar name emptyDbg
@@ -41,6 +46,12 @@ tabs arity body = Abs arity body [] emptyDbg
 app :: Term -> [Term] -> Term
 app fn args = App fn args emptyDbg
 
+ttrue = Tbool True emptyDbg
+
+tfalse = Tbool False emptyDbg
+
+tif :: Term -> Term -> Term -> Term
+tif cond cnsq alt = Tif cond cnsq alt emptyDbg
 
 -- eval/apply
 eval :: Term -> [Term] -> Term
@@ -49,15 +60,29 @@ eval (App fn args dbg) stack =
     let fn' = eval fn stack
     in let args' = map (`eval` stack) args
     in apply fn' args' dbg stack
+eval (Tif cond cnsq alt dbg) stack = evalIf cond cnsq alt dbg stack
 eval t _ = t
 
 apply :: Term -> [Term] -> Dbg -> [Term] -> Term
-apply a@(Abs arity body env _) args _ stack
+apply abs@(Abs arity body env _) args _ stack
     | length env + length args == arity = eval body (reverse args ++ env ++ stack)
-    | length env + length args < arity = a { absenv = reverse args ++ env }
+    | length env + length args < arity = abs { absEnv = reverse args ++ env }
     | otherwise = throw TermException
 apply _ _ _ _ = throw TermException
 
+evalIf :: Term -> Term -> Term -> Dbg -> [Term] -> Term
+evalIf cond cnsq alt _ stack
+    | isTrue (eval cond stack) = eval cnsq stack
+    | isFalse (eval cond stack) = eval alt stack
+    | otherwise = throw TermException
+
+isTrue :: Term -> Bool
+isTrue (Tbool True _) = True
+isTrue _ = False
+
+isFalse :: Term -> Bool
+isFalse (Tbool False _) = True
+isFalse _ = False
 
 -- combinators
 s :: Term
