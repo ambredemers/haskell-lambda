@@ -1,12 +1,19 @@
 module Lambda where
 import Control.Exception
 import Data.Data
+import Data.List
+import Data.Char
+import Data.Maybe
+import qualified Data.HashMap.Strict as Map
+import qualified Data.HashSet as Set
+import qualified Data.Text as Text
+import qualified Data.Tuple.Ops as TupleOps
 
 -- debug info
-data Dbg = Dbg { source :: String, dindex :: Int } deriving Eq
+data Dbg = Dbg { dSource :: Text.Text, dStart :: Int, dLength :: Int } deriving Eq
 
 emptyDbg :: Dbg
-emptyDbg = Dbg { source = "", dindex = 0 }
+emptyDbg = Dbg { dSource = Text.empty, dStart = 0, dLength = 0 }
 
 
 -- term exception
@@ -17,7 +24,7 @@ instance Exception TermException
 
 -- term
 data Term
-    = Fvar { fvarName :: String, fvarDbg :: Dbg }
+    = Fvar { fvarName :: Text.Text, fvarDbg :: Dbg }
     | Bvar { bvarIndex :: Int, barDbg :: Dbg }
     | Abs { absArity :: Int, absBody :: Term, absEnv :: [Term], absDbg :: Dbg }
     | App { appFn :: Term, appArgs :: [Term], appDbg :: Dbg }
@@ -26,7 +33,7 @@ data Term
     deriving Eq
 
 instance Show Term where
-    show (Fvar name _) = "(fvar " ++ name ++ ")"
+    show (Fvar name _) = "(fvar " ++ show name ++ ")"
     show (Bvar index _) = "(bvar " ++ show index ++ ")"
     show (Abs arity body _ _) = "(abs " ++ show arity ++ " " ++ show body ++ ")"
     show (App fn args _) = "(app " ++ show fn ++ " " ++ show args ++ ")"
@@ -35,7 +42,7 @@ instance Show Term where
     show (Tif cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ show alt ++ ")"
 
 fvar :: String -> Term
-fvar name = Fvar name emptyDbg
+fvar name = Fvar (Text.pack name) emptyDbg
 
 bvar :: Int -> Term
 bvar index = Bvar index emptyDbg
@@ -52,6 +59,7 @@ tfalse = Tbool False emptyDbg
 
 tif :: Term -> Term -> Term -> Term
 tif cond cnsq alt = Tif cond cnsq alt emptyDbg
+
 
 -- eval/apply
 eval :: Term -> [Term] -> Term
@@ -84,6 +92,7 @@ isFalse :: Term -> Bool
 isFalse (Tbool False _) = True
 isFalse _ = False
 
+
 -- combinators
 s :: Term
 s = tabs 3 (app (app (bvar 2) [bvar 0]) [app (bvar 1) [bvar 0]])
@@ -102,3 +111,44 @@ c = tabs 3 (app (bvar 2) [bvar 0, bvar 1])
 
 w :: Term
 w = tabs 2 (app (bvar 1) [bvar 0, bvar 0])
+
+-- tokenizer
+data Token
+    = Lparen { lpDbg :: Dbg }
+    | Rparen { rpDbg :: Dbg }
+    | Lambda { laDbg :: Dbg }
+    | ToIf { toIfDbg :: Dbg }
+    | ToTrue { toTDbg :: Dbg }
+    | ToFalse { toFDbg :: Dbg }
+    | ToVar { name :: Text.Text, toVDbg :: Dbg }
+
+specialChars :: Set.HashSet Char
+specialChars = Set.fromList ['(', ')', ' ', '\t', '\n', '\r', '\f', '\v']
+
+keywords :: Map.HashMap Text.Text (Dbg -> Token)
+keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
+    [ ("lambda", Lambda)
+    , ("if", ToIf)
+    , ("#true", ToTrue)
+    , ("#false", ToFalse) ]
+
+
+breakLength :: (Char -> Bool) -> Text.Text -> (Text.Text, Int, Text.Text) 
+breakLength predicate text =
+    let (head, tail) = Text.break predicate text
+    in let length = Text.length head
+    in (head, length, tail)
+
+dropWhileLength :: (Char -> Bool) -> Text.Text -> (Text.Text, Int)
+dropWhileLength predicate input =
+    f input 0
+    where f text index
+            | Just (head, tail) <- Text.uncons text, predicate head = f tail (index + 1)
+            | otherwise = (text, index)
+
+
+getToken :: Text.Text -> Dbg -> Token
+getToken input dbg =
+    let (lexeme, length, rest) = breakLength (`Set.member` specialChars) input
+    in let dbg2 = dbg{dLength = length}
+    in fromMaybe (ToVar lexeme) (Map.lookup lexeme keywords) dbg2
