@@ -10,7 +10,7 @@ import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
 
 -- debug info
-data Dbg = Dbg { dSource :: Text.Text, dStart :: Int, dLength :: Int } deriving Eq
+data Dbg = Dbg { dSource :: Text.Text, dStart :: Int, dLength :: Int } deriving (Eq, Show)
 
 emptyDbg :: Dbg
 emptyDbg = Dbg { dSource = Text.empty, dStart = 0, dLength = 0 }
@@ -121,9 +121,22 @@ data Token
     | ToTrue { toTDbg :: Dbg }
     | ToFalse { toFDbg :: Dbg }
     | ToVar { name :: Text.Text, toVDbg :: Dbg }
+    deriving (Eq, Show)
 
-specialChars :: Set.HashSet Char
-specialChars = Set.fromList ['(', ')', ' ', '\t', '\n', '\r', '\f', '\v']
+getTokenDbg :: Token -> Dbg
+getTokenDbg (Lparen dbg) = dbg
+getTokenDbg (Rparen dbg) = dbg
+getTokenDbg (Lambda dbg) = dbg
+getTokenDbg (ToIf dbg) = dbg
+getTokenDbg (ToTrue dbg) = dbg
+getTokenDbg (ToFalse dbg) = dbg
+getTokenDbg (ToVar _ dbg) = dbg
+
+specialChars :: [Char]
+specialChars = ['(', ')']
+
+isSpecialChar :: Char -> Bool
+isSpecialChar char = char `elem` specialChars
 
 keywords :: Map.HashMap Text.Text (Dbg -> Token)
 keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
@@ -132,23 +145,37 @@ keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
     , ("#true", ToTrue)
     , ("#false", ToFalse) ]
 
+getKeywordOrVar :: Text.Text -> Dbg -> Token
+getKeywordOrVar lexeme dbg =
+    let keyword = Map.lookup lexeme keywords
+    in fromMaybe (ToVar lexeme) keyword dbg
 
-breakLength :: (Char -> Bool) -> Text.Text -> (Text.Text, Int, Text.Text) 
-breakLength predicate text =
-    let (head, tail) = Text.break predicate text
-    in let length = Text.length head
-    in (head, length, tail)
-
-dropWhileLength :: (Char -> Bool) -> Text.Text -> (Text.Text, Int)
-dropWhileLength predicate input =
+skipSpaces :: Text.Text -> (Text.Text, Int)
+skipSpaces input =
     f input 0
     where f text index
-            | Just (head, tail) <- Text.uncons text, predicate head = f tail (index + 1)
+            | Just (head, tail) <- Text.uncons text, isSpace head = f tail (index + 1)
             | otherwise = (text, index)
 
+getToken :: Text.Text -> (Int -> Dbg) -> Maybe (Token, Text.Text)
+getToken input dbg
+    | Just ('(', rest) <- Text.uncons input = Just (Lparen (dbg 1), rest)
+    | Just (')', rest) <- Text.uncons input = Just (Rparen (dbg 1), rest)
+    | Just (char, _) <- Text.uncons input, isSpace char =
+        let (rest, skippedSpaces) = skipSpaces input
+        in let dbg2 = dbg 0
+        in let dbg3 = Dbg (dSource dbg2) (dStart dbg2 + skippedSpaces)
+        in getToken rest dbg3
+    | otherwise =
+        let (lexeme, rest) = Text.break (\char -> isSpecialChar char || isSpace char) input
+        in let length = Text.length lexeme
+        in if length == 0 then Nothing else Just (getKeywordOrVar lexeme (dbg length), rest)
 
-getToken :: Text.Text -> Dbg -> Token
-getToken input dbg =
-    let (lexeme, length, rest) = breakLength (`Set.member` specialChars) input
-    in let dbg2 = dbg{dLength = length}
-    in fromMaybe (ToVar lexeme) (Map.lookup lexeme keywords) dbg2
+tokenize :: Text.Text -> [Token]
+tokenize source =
+    f source 0
+    where f text i
+            | Just (token, rest) <- getToken text (Dbg source i) =
+                let dbg = getTokenDbg token
+                in token : f rest (dStart dbg + dLength dbg)
+            | otherwise = []
