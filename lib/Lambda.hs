@@ -10,10 +10,10 @@ import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
 
 -- debug info
-data Dbg = Dbg { dSource :: Text.Text, dStart :: Int, dLength :: Int } deriving (Eq, Show)
+data Dbg = Dbg {dStart :: Int, dEnd :: Int} deriving (Eq, Show)
 
 emptyDbg :: Dbg
-emptyDbg = Dbg { dSource = Text.empty, dStart = 0, dLength = 0 }
+emptyDbg = Dbg {dStart = 0, dEnd = 0}
 
 
 -- term exception
@@ -24,12 +24,12 @@ instance Exception TermException
 
 -- term
 data Term
-    = Fvar { fvarName :: Text.Text, fvarDbg :: Dbg }
-    | Bvar { bvarIndex :: Int, barDbg :: Dbg }
-    | Abs { absArity :: Int, absBody :: Term, absEnv :: [Term], absDbg :: Dbg }
-    | App { appFn :: Term, appArgs :: [Term], appDbg :: Dbg }
-    | Tbool { boolValue :: Bool, boolDbg :: Dbg }
-    | Tif { ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg }
+    = Fvar {fvarName :: Text.Text, fvarDbg :: Dbg}
+    | Bvar {bvarIndex :: Int, barDbg :: Dbg}
+    | Abs {absArity :: Int, absBody :: Term, absEnv :: [Term], absDbg :: Dbg}
+    | App {appFn :: Term, appArgs :: [Term], appDbg :: Dbg}
+    | Tbool {boolValue :: Bool, boolDbg :: Dbg}
+    | Tif {ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg}
     deriving Eq
 
 instance Show Term where
@@ -74,7 +74,7 @@ eval t _ = t
 apply :: Term -> [Term] -> Dbg -> [Term] -> Term
 apply abs@(Abs arity body env _) args _ stack
     | length env + length args == arity = eval body (reverse args ++ env ++ stack)
-    | length env + length args < arity = abs { absEnv = reverse args ++ env }
+    | length env + length args < arity = abs {absEnv = reverse args ++ env}
     | otherwise = throw TermException
 apply _ _ _ _ = throw TermException
 
@@ -114,13 +114,13 @@ w = tabs 2 (app (bvar 1) [bvar 0, bvar 0])
 
 -- tokenizer
 data Token
-    = Lparen { lpDbg :: Dbg }
-    | Rparen { rpDbg :: Dbg }
-    | Lambda { laDbg :: Dbg }
-    | ToIf { toIfDbg :: Dbg }
-    | ToTrue { toTDbg :: Dbg }
-    | ToFalse { toFDbg :: Dbg }
-    | ToVar { name :: Text.Text, toVDbg :: Dbg }
+    = Lparen {lpDbg :: Dbg}
+    | Rparen {rpDbg :: Dbg}
+    | Lambda {laDbg :: Dbg}
+    | ToIf {toIfDbg :: Dbg}
+    | ToTrue {toTDbg :: Dbg}
+    | ToFalse {toFDbg :: Dbg}
+    | ToVar {name :: Text.Text, toVDbg :: Dbg}
     deriving (Eq, Show)
 
 getTokenDbg :: Token -> Dbg
@@ -164,7 +164,8 @@ getToken input dbg
     | Just (char, _) <- Text.uncons input, isSpace char =
         let (rest, skippedSpaces) = skipSpaces input
         in let dbg2 = dbg 0
-        in let dbg3 = Dbg (dSource dbg2) (dStart dbg2 + skippedSpaces)
+        in let start = dStart dbg2 + skippedSpaces
+        in let dbg3 length = Dbg start (start + length)
         in getToken rest dbg3
     | otherwise =
         let (lexeme, rest) = Text.break (\char -> isSpecialChar char || isSpace char) input
@@ -175,7 +176,52 @@ tokenize :: Text.Text -> [Token]
 tokenize source =
     f source 0
     where f text i
-            | Just (token, rest) <- getToken text (Dbg source i) =
+            | Just (token, rest) <- getToken text (\length -> Dbg i (i + length)) =
                 let dbg = getTokenDbg token
-                in token : f rest (dStart dbg + dLength dbg)
+                in token : f rest (dEnd dbg)
             | otherwise = []
+
+
+-- = Fvar {fvarName :: Text.Text, fvarDbg :: Dbg}
+-- | Bvar {bvarIndex :: Int, barDbg :: Dbg}
+-- | Abs {absArity :: Int, absBody :: Term, absEnv :: [Term], absDbg :: Dbg}
+-- | App {appFn :: Term, appArgs :: [Term], appDbg :: Dbg}
+-- | Tbool {boolValue :: Bool, boolDbg :: Dbg}
+-- | Tif {ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg}
+
+-- = Lparen {lpDbg :: Dbg}
+-- | Rparen {rpDbg :: Dbg}
+-- | Lambda {laDbg :: Dbg}
+-- | ToIf {toIfDbg :: Dbg}
+-- | ToTrue {toTDbg :: Dbg}
+-- | ToFalse {toFDbg :: Dbg}
+-- | ToVar {name :: Text.Text, toVDbg :: Dbg}
+
+-- parser
+-- <term> ::=
+--     | <var>
+--     | (lambda (<var>*) <term>)
+--     | (<term> <term>)
+--     | #true
+--     | #false
+--     | (if <term> <term> <term>)
+
+newtype ParseError = ParseError {peMessage :: Text.Text} deriving Show
+
+-- parseTerm :: [Token] -> (Maybe Term, [Token], [ParseError])
+-- parseTerm [] = (Nothing, [], [ParseError (Text.pack "token list was empty")])
+-- parseTerm (ToVar name dbg : rest) = (Just (Fvar name dbg), rest, [])
+-- parseTerm (ToTrue dbg : rest) = (Just (Tbool True dbg), rest, [])
+-- parseTerm (ToFalse dbg : rest) = (Just (Tbool False dbg), rest, [])
+-- parseTerm tokens@(Lparen _ : Lambda _ : _) = parseAbs tokens
+-- parseTerm tokens@(Lparen _ : ToIf _ : _) = parseIf tokens
+-- parseTerm tokens@(Lparen _ : _) = parseApp tokens
+
+-- parseAbs :: [Token] -> (Maybe Term, [Token], [ParseError])
+-- parseAbs (Lparen) = h
+
+-- parseIf :: [Token] -> (Maybe Term, [Token], [ParseError])
+-- parseIf = h
+
+-- parseApp :: [Token] -> (Maybe Term, [Token], [ParseError])
+-- parseApp = h

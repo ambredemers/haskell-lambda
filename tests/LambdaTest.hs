@@ -42,38 +42,35 @@ testIfFalse =
 
 testTokenize :: Test
 testTokenize =
-    let source = Text.pack "(lambda (left right) (if left (if right #true #false) #false))"
-    in let expected =
-            [ Lparen {lpDbg = Dbg {dSource = source, dStart = 0, dLength = 1}}
-            , Lambda {laDbg = Dbg {dSource = source, dStart = 1, dLength = 6}}
-            , Lparen {lpDbg = Dbg {dSource = source, dStart = 8, dLength = 1}}
-            , ToVar {name = Text.pack "left", toVDbg = Dbg {dSource = source, dStart = 9, dLength = 4}}
-            , ToVar {name = Text.pack "right", toVDbg = Dbg {dSource = source, dStart = 14, dLength = 5}}
-            , Rparen {rpDbg = Dbg {dSource = source, dStart = 19, dLength = 1}}
-            , Lparen {lpDbg = Dbg {dSource = source, dStart = 21, dLength = 1}}
-            , ToIf {toIfDbg = Dbg {dSource = source, dStart = 22, dLength = 2}}
-            , ToVar {name = Text.pack "left", toVDbg = Dbg {dSource = source, dStart = 25, dLength = 4}}
-            , Lparen {lpDbg = Dbg {dSource = source, dStart = 30, dLength = 1}}
-            , ToIf {toIfDbg = Dbg {dSource = source, dStart = 31, dLength = 2}}
-            , ToVar {name = Text.pack "right", toVDbg = Dbg {dSource = source, dStart = 34, dLength = 5}}
-            , ToTrue {toTDbg = Dbg {dSource = source, dStart = 40, dLength = 5}}
-            , ToFalse {toFDbg = Dbg {dSource = source, dStart = 46, dLength = 6}}
-            , Rparen {rpDbg = Dbg {dSource = source, dStart = 52, dLength = 1}}
-            , ToFalse {toFDbg = Dbg {dSource = source, dStart = 54, dLength = 6}}
-            , Rparen {rpDbg = Dbg {dSource = source, dStart = 60, dLength = 1}}
-            , Rparen {rpDbg = Dbg {dSource = source, dStart = 61, dLength = 1}}]
-    in let actual = tokenize source
+    let expected =
+            [ Lparen {lpDbg = Dbg {dStart = 0, dEnd = 1}}
+            , Lambda {laDbg = Dbg {dStart = 1, dEnd = 7}}
+            , Lparen {lpDbg = Dbg {dStart = 8, dEnd = 9}}
+            , ToVar {name = Text.pack "left", toVDbg = Dbg {dStart = 9, dEnd = 13}}
+            , ToVar {name = Text.pack "right", toVDbg = Dbg {dStart = 14, dEnd = 19}}
+            , Rparen {rpDbg = Dbg {dStart = 19, dEnd = 20}}
+            , Lparen {lpDbg = Dbg {dStart = 21, dEnd = 22}}
+            , ToIf {toIfDbg = Dbg {dStart = 22, dEnd = 24}}
+            , ToVar {name = Text.pack "left", toVDbg = Dbg {dStart = 25, dEnd = 29}}
+            , Lparen {lpDbg = Dbg {dStart = 30, dEnd = 31}}
+            , ToIf {toIfDbg = Dbg {dStart = 31, dEnd = 33}}
+            , ToVar {name = Text.pack "right", toVDbg = Dbg {dStart = 34, dEnd = 39}}
+            , ToTrue {toTDbg = Dbg {dStart = 40, dEnd = 45}}
+            , ToFalse {toFDbg = Dbg {dStart = 46, dEnd = 52}}
+            , Rparen {rpDbg = Dbg {dStart = 52, dEnd = 53}}
+            , ToFalse {toFDbg = Dbg {dStart = 54, dEnd = 60}}
+            , Rparen {rpDbg = Dbg {dStart = 60, dEnd = 61}}
+            , Rparen {rpDbg = Dbg {dStart = 61, dEnd = 62}}]
+    in let actual = tokenize (Text.pack "(lambda (left right) (if left (if right #true #false) #false))")
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 tests = TestList
-    [
-        TestLabel "testskk" testskk,
-        TestLabel "tessti" testi,
-        TestLabel "testIfTrue" testIfTrue,
-        TestLabel "testIfFalse" testIfFalse,
-        TestLabel "testTokenize" testTokenize
-    ]
+    [ TestLabel "testskk" testskk
+    , TestLabel "tessti" testi
+    , TestLabel "testIfTrue" testIfTrue
+    , TestLabel "testIfFalse" testIfFalse
+    , TestLabel "testTokenize" testTokenize]
 
 main = do
     result <- runTestTT tests
