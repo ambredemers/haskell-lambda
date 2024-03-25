@@ -214,9 +214,13 @@ data PTerm
     | PApp {paFun :: PTerm, paArgs :: [PTerm], paDbg :: Dbg}
     | PBool {pbBool :: Bool, pbDbg :: Dbg}
     | PIf {piCond :: PTerm, piCnsq :: PTerm, piAlt :: PTerm, piDbg :: Dbg}
+    deriving Show
 
-parseError :: String -> ParseError
-parseError expected = ParseError (Text.pack ("expected " ++ expected ++ " but got something else"))
+parseError :: String -> String -> ParseError
+parseError function expected =
+    let location = "Parse error at " ++ function ++ ": " 
+    in let message = "expected " ++ expected ++ " but got something else"
+    in ParseError (Text.pack (location ++ message))
 
 parseTerm :: [Token] -> (Either ParseError PTerm, [Token])
 parseTerm [] = (Left (ParseError (Text.pack "token list was empty")), [])
@@ -231,20 +235,25 @@ parseLambda :: [Token] -> (Either ParseError PTerm, [Token])
 parseLambda tokens@(Lparen (Dbg start _) : Lambda _ : Lparen _ : rest)
     | (Right vars, rest2) <- parseVars rest
     , (Right body, Rparen (Dbg _ end) : rest3) <- parseTerm rest2 =
-        (Right (PLambda vars body (Dbg start end)), rest3)
-parseLambda tokens = (Left (parseError "(lambda (<var>*) <term>)"), tokens)
+        (Right (PLambda vars body (Dbg start end)), rest3) -- success
+    | (Left error, _) <- parseVars rest = (Left error, tokens) -- error parsing vars
+    | (Right vars, rest2) <- parseVars rest
+    , (Right body, _) <- parseTerm rest2 =
+        (Left (parseError "parseLambda" ")"), tokens) --
+parseLambda tokens = (Left (parseError "parseLambda" "(lambda (<var>*) <term>)"), tokens)
 
 parseVars :: [Token] -> (Either ParseError [PTerm], [Token])
 parseVars tokens
-    | (vars, Rparen _ : rest) <- break isPVar tokens =
+    | (vars, Rparen _ : rest) <- span isPVar tokens =
         let vars2 = map pVarOfToVar vars
         in (Right vars2, rest)
+    | otherwise =
+        (Left (parseError "parseVars" ")"), tokens)
         where
                 pVarOfToVar (ToVar name dbg) = PVar name dbg
                 pVarOfToVar _ = throw TermException
                 isPVar (ToVar _ _) = True
                 isPVar _ = False
-parseVars tokens = (Left (parseError "<var>*)"), tokens)
 
 parseIf :: [Token] -> (Either ParseError PTerm, [Token])
 parseIf tokens@(Lparen (Dbg start _) : ToIf _ : rest)
@@ -252,14 +261,14 @@ parseIf tokens@(Lparen (Dbg start _) : ToIf _ : rest)
     , (Right cnsq, rest3) <- parseTerm rest2
     , (Right alt, Rparen (Dbg _ end) : rest4) <- parseTerm rest3 =
         (Right (PIf cond cnsq alt (Dbg start end)), rest4)
-    | otherwise = (Left (parseError "(if <term> <term> <term>)"), tokens)
+    | otherwise = (Left (parseError "parseIf" "(if <term> <term> <term>)"), tokens)
 
 parseApp :: [Token] -> (Either ParseError PTerm, [Token])
 parseApp tokens@(Lparen (Dbg start _) : rest)
     | (Right fun, rest2) <- parseTerm rest
     , (Right args, Rparen (Dbg _ end) : rest3) <- parseTerms rest2 =
         (Right (PApp fun args (Dbg start end)), rest3)
-    | otherwise = (Left (parseError "(<term> <term>*)"), tokens)
+    | otherwise = (Left (parseError "parseApp" "(<term> <term>*)"), tokens)
 
 parseTerms :: [Token] -> (Either ParseError [PTerm], [Token])
 parseTerms (Rparen _ : rest) = (Right [], rest)
