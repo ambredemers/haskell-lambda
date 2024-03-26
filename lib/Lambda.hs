@@ -206,7 +206,7 @@ tokenize source =
 --     | #false
 --     | (if <term> <term> <term>)
 
-newtype ParseError = ParseError {peMessage :: Text.Text} deriving Show
+newtype ParseError = ParseError {peMessage :: Text.Text} deriving (Eq, Show)
 
 data PTerm
     = PVar {pvName :: Text.Text, pvDbg :: Dbg}
@@ -214,7 +214,7 @@ data PTerm
     | PApp {paFun :: PTerm, paArgs :: [PTerm], paDbg :: Dbg}
     | PBool {pbBool :: Bool, pbDbg :: Dbg}
     | PIf {piCond :: PTerm, piCnsq :: PTerm, piAlt :: PTerm, piDbg :: Dbg}
-    deriving Show
+    deriving (Eq, Show)
 
 parseError :: String -> String -> ParseError
 parseError function expected =
@@ -271,8 +271,9 @@ parseApp tokens@(Lparen (Dbg start _) : rest)
     | otherwise = (Left (parseError "parseApp" "(<term> <term>*)"), tokens)
 
 parseTerms :: [Token] -> (Either ParseError [PTerm], [Token])
-parseTerms (Rparen _ : rest) = (Right [], rest)
+parseTerms rest@(Rparen _ : _) = (Right [], rest)
 parseTerms tokens
     | (Right term, rest) <- parseTerm tokens
     , (Right tail, rest2) <- parseTerms rest =
         (Right (term : tail), rest2)
+    | otherwise = (Left (parseError "parseTerms" "<term>*"), tokens)

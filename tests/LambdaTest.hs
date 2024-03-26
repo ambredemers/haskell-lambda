@@ -65,6 +65,32 @@ testTokenize =
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
+testParseTerm :: Test
+testParseTerm =
+    let expected =
+            (Right (PApp
+                { paFun = PLambda
+                    { plVars =
+                        [ PVar {pvName = Text.pack "left", pvDbg = Dbg {dStart = 10, dEnd = 14}}
+                        , PVar {pvName = Text.pack "right", pvDbg = Dbg {dStart = 15, dEnd = 20}}]
+                    , plBody = PIf
+                        { piCond = PVar {pvName = Text.pack "left", pvDbg = Dbg {dStart = 26, dEnd = 30}}
+                        , piCnsq = PIf
+                            { piCond = PVar {pvName = Text.pack "right", pvDbg = Dbg {dStart = 35, dEnd = 40}}
+                            , piCnsq = PBool {pbBool = True, pbDbg = Dbg {dStart = 41, dEnd = 46}}
+                            , piAlt = PBool {pbBool = False, pbDbg = Dbg {dStart = 47, dEnd = 53}}
+                            , piDbg = Dbg {dStart = 31, dEnd = 54}}
+                        , piAlt = PBool {pbBool = False, pbDbg = Dbg {dStart = 55, dEnd = 61}}
+                        , piDbg = Dbg {dStart = 22, dEnd = 62}}, plDbg = Dbg {dStart = 1, dEnd = 63}}
+                , paArgs =
+                    [ PBool {pbBool = True, pbDbg = Dbg {dStart = 64, dEnd = 69}}
+                    , PBool {pbBool = True, pbDbg = Dbg {dStart = 70, dEnd = 75}}]
+                , paDbg = Dbg {dStart = 0, dEnd = 76}})
+            , []) :: (Either ParseError PTerm, [Token])
+    in let input = "((lambda (left right) (if left (if right #true #false) #false)) #true #true)"
+    in let actual = parseTerm (tokenize (Text.pack input))
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
 tests = TestList
     [ TestLabel "testskk" testskk
     , TestLabel "tessti" testi
