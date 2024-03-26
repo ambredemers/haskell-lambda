@@ -14,29 +14,29 @@ import Data.Char
 
 testskk :: Test
 testskk =
-    let expected = fvar "x"
-    in let actual = eval (app (app (app s [k]) [k]) [fvar "x"]) []
+    let expected = tFVar "x"
+    in let actual = eval (tApp (tApp (tApp s [k]) [k]) [tFVar "x"]) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testi :: Test
 testi =
-    let expected = fvar "x"
-    in let actual = eval (app i [fvar "x"]) []
+    let expected = tFVar "x"
+    in let actual = eval (tApp i [tFVar "x"]) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testIfTrue :: Test
 testIfTrue =
-    let expected = fvar "x"
-    in let actual = eval (tif ttrue (fvar "x") (fvar "y")) []
+    let expected = tFVar "x"
+    in let actual = eval (tIf tTrue (tFVar "x") (tFVar "y")) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testIfFalse :: Test
 testIfFalse =
-    let expected = fvar "y"
-    in let actual = eval (tif tfalse (fvar "x") (fvar "y")) []
+    let expected = tFVar "y"
+    in let actual = eval (tIf tFalse (tFVar "x") (tFVar "y")) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
@@ -91,6 +91,42 @@ testParseTerm =
     in let actual = parseTerm (tokenize (Text.pack input))
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
+
+testEvalStringI :: Test
+testEvalStringI =
+    let expected = "Just (abs 1 (bvar 0))"
+    in let actual = show (evalString "(lambda (x) x)")
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
+
+testEvalStringIfTrue :: Test
+testEvalStringIfTrue =
+    let expected = "Just (fvar \"x\")"
+    in let actual = show (evalString "(if #true x y)")
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
+
+testEvalStringIfFalse :: Test
+testEvalStringIfFalse =
+    let expected = "Just (fvar \"x\")"
+    in let actual = show (evalString "(if #true x y)")
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
+
+-- test :: Test
+-- test =
+--     let expected = expected
+--     in let actual = actual
+--     in let message = "expected " ++ show expected ++ " but got " ++ show actual
+--     in TestCase (assertEqual message expected actual)
+
+-- test :: Test
+-- test =
+--     let expected = expected
+--     in let actual = actual
+--     in let message = "expected " ++ show expected ++ " but got " ++ show actual
+--     in TestCase (assertEqual message expected actual)
+
 tests = TestList
     [ TestLabel "testskk" testskk
     , TestLabel "tessti" testi
