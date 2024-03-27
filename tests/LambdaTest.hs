@@ -94,22 +94,36 @@ testParseTerm =
 
 testEvalStringI :: Test
 testEvalStringI =
-    let expected = "Just (abs 1 (bvar 0))"
+    let expected = "Right (abs 1 (bvar 0))"
     in let actual = show (evalString "(lambda (x) x)")
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testEvalStringIfTrue :: Test
 testEvalStringIfTrue =
-    let expected = "Just (fvar \"x\")"
+    let expected = "Right (fvar \"x\")"
     in let actual = show (evalString "(if #true x y)")
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testEvalStringIfFalse :: Test
 testEvalStringIfFalse =
-    let expected = "Just (fvar \"x\")"
+    let expected = "Right (fvar \"x\")"
     in let actual = show (evalString "(if #true x y)")
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
+
+testExtraArgs :: Test
+testExtraArgs =
+    let expected = "Left (EvalError \"apply - the function expected 1arguments, but got 2\")"
+    in let actual = show (evalString "((lambda (x) x) y z)")
+    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in TestCase (assertEqual message expected actual)
+
+testInvalidArgs :: Test
+testInvalidArgs =
+    let expected = "Left (ParseError \"parseApp - expected (<term> <term>*) but got something else\")"
+    in let actual = show (evalString "((lambda (x) x) ((lambda (x) x) y z)")
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 

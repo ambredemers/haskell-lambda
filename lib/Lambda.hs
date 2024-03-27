@@ -26,7 +26,6 @@ data Term
     | TApp {appFn :: Term, appArgs :: [Term], appDbg :: Dbg}
     | TBool {boolValue :: Bool, boolDbg :: Dbg}
     | TIf {ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg}
-    | TError {teMessage :: Text.Text, teDbg :: Dbg}
     deriving Eq
 
 instance Show Term where
@@ -61,35 +60,46 @@ tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
 
 
 -- eval/apply
-newtype EvalError = EvalError {eeMessage :: String} deriving (Eq, Show)
+newtype EvalError = EvalError {eeMessage :: String} deriving Eq
+
+instance Show EvalError where
+    show (EvalError message) = "(EvalError " ++ show message ++ ")"
 
 eval :: Term -> [Term] -> Either EvalError Term
 eval fvar@(TFVar _ _) _ = Right fvar
 eval (TBVar index _) stack
     | index < length stack = Right (stack !! index)
-    | otherwise = Left (EvalError "eval TBVar - invalid index")
+    | otherwise = Left (EvalError ("eval TBVar - invalid index" ++ show index))
 eval abs@(TAbs {}) _ = Right abs
 eval (TApp fn args dbg) stack
     | Right fn' <- eval fn stack
     , ([], args') <- partitionEithers (map (`eval` stack) args) =
         apply fn' args' dbg stack
-    | Right _ <- eval fn stack = Left (EvalError "eval TApp - error evaluating args")
-    | otherwise = Left (EvalError "eval TApp - error evaluating fn")
+    | Right _ <- eval fn stack
+    , (failedArgs, _) <- partitionEithers (map (`eval` stack) args) 
+        = Left (EvalError ("eval TApp - error evaluating args: " ++ show failedArgs))
+    | Left failedFn <- eval fn stack =
+        Left (EvalError ("eval TApp - error evaluating fn: " ++ show failedFn))
 eval bool@(TBool {}) _ = Right bool
 eval (TIf cond cnsq alt dbg) stack = evalIf cond cnsq alt dbg stack
-eval t _ = Left (EvalError ("eval - failed to evaluate term: " ++ show t))
 
 apply :: Term -> [Term] -> Dbg -> [Term] -> Either EvalError Term
 apply abs@(TAbs arity body env _) args _ stack
     | length env + length args == arity = eval body (reverse args ++ env ++ stack)
     | length env + length args < arity = Right (abs {tAbsEnv = reverse args ++ env})
-    | otherwise = Left (EvalError ("apply - failed to apply term: " ++ show abs))
-apply abs _ _ _ = Left (EvalError ("apply - expected abs but got: " ++ show abs))
+    | otherwise =
+        let expectedArgs = arity - length env
+        in let actualArgs = length env + length args
+        in Left (EvalError (
+            "apply - the function expected " ++ show expectedArgs ++ "arguments, "
+            ++ "but got " ++ show actualArgs))
+apply term _ _ _ = Left (EvalError ("apply - expected abs but got: " ++ show term))
 
 evalIf :: Term -> Term -> Term -> Dbg -> [Term] -> Either EvalError Term
 evalIf cond cnsq alt _ stack
     | Right (TBool True _) <- eval cond stack = eval cnsq stack
     | Right (TBool False _) <- eval cond stack = eval alt stack
+    | Left evalError <- eval cond stack = Left evalError
     | otherwise = Left (EvalError ("evalIf - expected boolean but got " ++ show cond))
 
 
@@ -192,7 +202,10 @@ tokenize source =
 --     | #false
 --     | (if <term> <term> <term>)
 
-newtype ParseError = ParseError {peMessage :: Text.Text} deriving (Eq, Show)
+newtype ParseError = ParseError {peMessage :: Text.Text} deriving Eq
+
+instance Show ParseError where
+    show (ParseError message) = "(ParseError " ++ show message ++ ")"
 
 data PTerm
     = PVar {pvName :: Text.Text, pvDbg :: Dbg}
@@ -204,7 +217,7 @@ data PTerm
 
 parseError :: String -> String -> ParseError
 parseError function expected =
-    let location = "Parse error at " ++ function ++ ": "
+    let location = function ++ " - "
     in let message = "expected " ++ expected ++ " but got something else"
     in ParseError (Text.pack (location ++ message))
 
@@ -281,9 +294,23 @@ termOfPTerm (PIf cond cnsq alt dbg) context =
     in let alt2 = termOfPTerm alt context
     in TIf cond2 cnsq2 alt2 dbg
 
-evalString :: String -> Maybe Term
+data TError
+    = TPE ParseError
+    | TEE EvalError
+
+instance Show TError where
+    show (TPE parseError) = show parseError
+    show (TEE evalError) = show evalError
+
+evalString :: String -> Either TError Term
 evalString input
     | (Right term, []) <- parseTerm (tokenize (Text.pack input))
     , Right result <- eval (termOfPTerm term []) [] =
-        Just result
-    | otherwise = Nothing
+        Right result
+    | (Right term, []) <- parseTerm (tokenize (Text.pack input))
+    , Left evalError <- eval (termOfPTerm term []) [] =
+        Left (TEE evalError)
+    | (Left parseError, _) <- parseTerm (tokenize (Text.pack input)) =
+        Left (TPE parseError)
+    | (_, _ : _) <- parseTerm (tokenize (Text.pack input)) =
+        Left (TPE (ParseError (Text.pack "evalString - unexpected input after term")))
