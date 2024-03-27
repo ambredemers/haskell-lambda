@@ -14,28 +14,28 @@ import Data.Char
 
 testskk :: Test
 testskk =
-    let expected = tFVar "x"
+    let expected = Right (tFVar "x") :: Either EvalError Term
     in let actual = eval (tApp (tApp (tApp s [k]) [k]) [tFVar "x"]) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testi :: Test
 testi =
-    let expected = tFVar "x"
+    let expected = Right (tFVar "x") :: Either EvalError Term
     in let actual = eval (tApp i [tFVar "x"]) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testIfTrue :: Test
 testIfTrue =
-    let expected = tFVar "x"
+    let expected = Right (tFVar "x") :: Either EvalError Term
     in let actual = eval (tIf tTrue (tFVar "x") (tFVar "y")) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
 testIfFalse :: Test
 testIfFalse =
-    let expected = tFVar "y"
+    let expected = Right (tFVar "y") :: Either EvalError Term
     in let actual = eval (tIf tFalse (tFVar "x") (tFVar "y")) []
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
@@ -113,26 +113,15 @@ testEvalStringIfFalse =
     in let message = "expected " ++ show expected ++ " but got " ++ show actual
     in TestCase (assertEqual message expected actual)
 
--- test :: Test
--- test =
---     let expected = expected
---     in let actual = actual
---     in let message = "expected " ++ show expected ++ " but got " ++ show actual
---     in TestCase (assertEqual message expected actual)
-
--- test :: Test
--- test =
---     let expected = expected
---     in let actual = actual
---     in let message = "expected " ++ show expected ++ " but got " ++ show actual
---     in TestCase (assertEqual message expected actual)
-
 tests = TestList
     [ TestLabel "testskk" testskk
     , TestLabel "tessti" testi
     , TestLabel "testIfTrue" testIfTrue
     , TestLabel "testIfFalse" testIfFalse
-    , TestLabel "testTokenize" testTokenize]
+    , TestLabel "testTokenize" testTokenize
+    , TestLabel "testEvalStringI" testEvalStringI
+    , TestLabel "testEvalStringIfTrue" testEvalStringIfTrue
+    , TestLabel "testEvalStringIfFalse" testEvalStringIfFalse]
 
 main = do
     result <- runTestTT tests

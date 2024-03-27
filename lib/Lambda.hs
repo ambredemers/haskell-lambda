@@ -8,6 +8,7 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.HashSet as Set
 import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
+import Data.Either (partitionEithers)
 
 
 -- debug info
@@ -15,12 +16,6 @@ data Dbg = Dbg {dStart :: Int, dEnd :: Int} deriving (Eq, Show)
 
 emptyDbg :: Dbg
 emptyDbg = Dbg {dStart = 0, dEnd = 0}
-
-
--- term exception
-data TermException = TermException deriving (Show, Typeable)
-
-instance Exception TermException
 
 
 -- term
@@ -35,13 +30,13 @@ data Term
     deriving Eq
 
 instance Show Term where
-    show (TFVar name _) = "(TfVar " ++ show name ++ ")"
+    show (TFVar name _) = "(fvar " ++ show name ++ ")"
     show (TBVar index _) = "(bvar " ++ show index ++ ")"
-    show (TAbs arity body _ _) = "(Tabs " ++ show arity ++ " " ++ show body ++ ")"
+    show (TAbs arity body _ _) = "(abs " ++ show arity ++ " " ++ show body ++ ")"
     show (TApp fn args _) = "(app " ++ show fn ++ " " ++ show args ++ ")"
     show (TBool True _) = "#true"
     show (TBool False _) = "#false"
-    show (TIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ show alt ++ ")"
+    show (TIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
 
 tFVar :: String -> Term
 tFVar name = TFVar (Text.pack name) emptyDbg
@@ -66,35 +61,36 @@ tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
 
 
 -- eval/apply
-eval :: Term -> [Term] -> Term
-eval (TBVar index _) stack | index < length stack = stack !! index
-eval (TApp fn args dbg) stack =
-    let fn' = eval fn stack
-    in let args' = map (`eval` stack) args
-    in apply fn' args' dbg stack
-eval (TIf cond cnsq alt dbg) stack = evalIf cond cnsq alt dbg stack
-eval t _ = t
+newtype EvalError = EvalError {eeMessage :: String} deriving (Eq, Show)
 
-apply :: Term -> [Term] -> Dbg -> [Term] -> Term
+eval :: Term -> [Term] -> Either EvalError Term
+eval fvar@(TFVar _ _) _ = Right fvar
+eval (TBVar index _) stack
+    | index < length stack = Right (stack !! index)
+    | otherwise = Left (EvalError "eval TBVar - invalid index")
+eval abs@(TAbs {}) _ = Right abs
+eval (TApp fn args dbg) stack
+    | Right fn' <- eval fn stack
+    , ([], args') <- partitionEithers (map (`eval` stack) args) =
+        apply fn' args' dbg stack
+    | Right _ <- eval fn stack = Left (EvalError "eval TApp - error evaluating args")
+    | otherwise = Left (EvalError "eval TApp - error evaluating fn")
+eval bool@(TBool {}) _ = Right bool
+eval (TIf cond cnsq alt dbg) stack = evalIf cond cnsq alt dbg stack
+eval t _ = Left (EvalError ("eval - failed to evaluate term: " ++ show t))
+
+apply :: Term -> [Term] -> Dbg -> [Term] -> Either EvalError Term
 apply abs@(TAbs arity body env _) args _ stack
     | length env + length args == arity = eval body (reverse args ++ env ++ stack)
-    | length env + length args < arity = abs {tAbsEnv = reverse args ++ env}
-    | otherwise = throw TermException
-apply _ _ _ _ = throw TermException
+    | length env + length args < arity = Right (abs {tAbsEnv = reverse args ++ env})
+    | otherwise = Left (EvalError ("apply - failed to apply term: " ++ show abs))
+apply abs _ _ _ = Left (EvalError ("apply - expected abs but got: " ++ show abs))
 
-evalIf :: Term -> Term -> Term -> Dbg -> [Term] -> Term
+evalIf :: Term -> Term -> Term -> Dbg -> [Term] -> Either EvalError Term
 evalIf cond cnsq alt _ stack
-    | isTrue (eval cond stack) = eval cnsq stack
-    | isFalse (eval cond stack) = eval alt stack
-    | otherwise = throw TermException
-
-isTrue :: Term -> Bool
-isTrue (TBool True _) = True
-isTrue _ = False
-
-isFalse :: Term -> Bool
-isFalse (TBool False _) = True
-isFalse _ = False
+    | Right (TBool True _) <- eval cond stack = eval cnsq stack
+    | Right (TBool False _) <- eval cond stack = eval alt stack
+    | otherwise = Left (EvalError ("evalIf - expected boolean but got " ++ show cond))
 
 
 -- combinators
@@ -241,7 +237,6 @@ parseVars tokens
         (Left (parseError "parseVars" ")"), tokens)
         where
                 pVarOfToVar (ToVar name dbg) = PVar name dbg
-                pVarOfToVar _ = throw TermException
                 isPVar (ToVar _ _) = True
                 isPVar _ = False
 
@@ -288,5 +283,7 @@ termOfPTerm (PIf cond cnsq alt dbg) context =
 
 evalString :: String -> Maybe Term
 evalString input
-    | (Right term, []) <- parseTerm (tokenize (Text.pack input)) = Just (eval (termOfPTerm term []) [])
+    | (Right term, []) <- parseTerm (tokenize (Text.pack input))
+    , Right result <- eval (termOfPTerm term []) [] =
+        Just result
     | otherwise = Nothing
