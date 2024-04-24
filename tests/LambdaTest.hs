@@ -94,21 +94,21 @@ testParseTerm =
 
 testEvalStringI :: Test
 testEvalStringI =
-    let expected = "Right (abs 1 (bvar 0))"
+    let expected = "Right (lambda (x) x)"
     in let actual = show (evalString "(lambda (x) x)")
     in let message = "testEvalStringI: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testEvalStringIfTrue :: Test
 testEvalStringIfTrue =
-    let expected = "Right (fvar \"x\")"
+    let expected = "Right x"
     in let actual = show (evalString "(if #true x y)")
     in let message = "testEvalStringIfTrue: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testEvalStringIfFalse :: Test
 testEvalStringIfFalse =
-    let expected = "Right (fvar \"x\")"
+    let expected = "Right x"
     in let actual = show (evalString "(if #true x y)")
     in let message = "testEvalStringIfFalse: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)

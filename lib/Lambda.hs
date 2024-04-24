@@ -34,17 +34,18 @@ makeErrorString input dbg@(Dbg start end) message =
 -- term
 data Term
     = TFVar {tFVarName :: Text.Text, tfVarDbg :: Dbg}
-    | TBVar {tBvarIndex :: Int, barDbg :: Dbg}
-    | TAbs {tAbsArity :: Int, tAbsBody :: Term, tAbsEnv :: [Term], tAbsDbg :: Dbg}
+    | TBVar {tBvarIndex :: Int, tBVarName :: Text.Text, barDbg :: Dbg}
+    | TAbs {tAbsArity :: Int, tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
     | TApp {appFn :: Term, appArgs :: [Term], appDbg :: Dbg}
     | TBool {boolValue :: Bool, boolDbg :: Dbg}
     | TIf {ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg}
     deriving Eq
 
 instance Show Term where
-    show (TFVar name _) = "(fvar " ++ show name ++ ")"
-    show (TBVar index _) = "(bvar " ++ show index ++ ")"
-    show (TAbs arity body _ _) = "(abs " ++ show arity ++ " " ++ show body ++ ")"
+    show (TFVar name _) = Text.unpack name
+    show (TBVar _ name _) = Text.unpack name
+    show (TAbs _ body [] varNames _) = "(lambda (" ++ unwords (map Text.unpack varNames) ++ ") " ++ show body ++ ")"
+    show abs@(TAbs _ _ env _ _) = "(closure (" ++ unwords (map show env)  ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
     show (TApp fn args _) = "(app " ++ show fn ++ " " ++ show args ++ ")"
     show (TBool True _) = "#true"
     show (TBool False _) = "#false"
@@ -54,10 +55,10 @@ tFVar :: String -> Term
 tFVar name = TFVar (Text.pack name) emptyDbg
 
 tBVar :: Int -> Term
-tBVar index = TBVar index emptyDbg
+tBVar index = TBVar index (Text.pack (show index)) emptyDbg
 
 tAbs :: Int -> Term -> Term
-tAbs arity body = TAbs arity body [] emptyDbg
+tAbs arity body = TAbs arity body [] [] emptyDbg
 
 tApp :: Term -> [Term] -> Term
 tApp fn args = TApp fn args emptyDbg
@@ -75,7 +76,7 @@ tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
 -- eval/apply
 eval :: Text.Text -> Term -> [Term] -> Either String Term
 eval _ fvar@(TFVar _ _) _ = Right fvar
-eval input (TBVar index dbg) stack
+eval input (TBVar index _ dbg) stack
     | index < length stack = Right (stack !! index)
     | otherwise = Left (makeErrorString input dbg ("Could not evaluate bound variable - invalid index" ++ show index))
 eval _ abs@(TAbs {}) _ = Right abs
@@ -92,7 +93,7 @@ eval _ bool@(TBool {}) _ = Right bool
 eval input (TIf cond cnsq alt dbg) stack = evalIf input cond cnsq alt dbg stack
 
 apply :: Text.Text -> Term -> [Term] -> Dbg -> [Term] -> Either String Term
-apply input abs@(TAbs arity body env _) args dbg stack
+apply input abs@(TAbs arity body env _ _) args dbg stack
     | length env + length args == arity = eval input body (reverse args ++ env ++ stack)
     | length env + length args < arity = Right (abs {tAbsEnv = reverse args ++ env})
     | otherwise =
@@ -157,6 +158,7 @@ specialChars = ['(', ')']
 isSpecialChar :: Char -> Bool
 isSpecialChar char = char `elem` specialChars
 
+-- TODO: add quit as a keyword
 keywords :: Map.HashMap Text.Text (Dbg -> Token)
 keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
     [ ("lambda", Lambda)
@@ -275,11 +277,11 @@ parseTerms input tokens
 
 termOfPTerm :: PTerm -> [Text.Text] -> Term
 termOfPTerm (PVar name dbg) context
-    | (Just index) <- elemIndex name context = TBVar index dbg
+    | (Just index) <- elemIndex name context = TBVar index name dbg
     | otherwise = TFVar name dbg
 termOfPTerm (PLambda vars body dbg) context =
     let body2 = termOfPTerm body (reverse (map pvName vars) ++ context)
-    in TAbs (length vars) body2 [] dbg
+    in TAbs (length vars) body2 [] (map pvName vars) dbg
 termOfPTerm (PApp fun args dbg) context =
     let fun2 = termOfPTerm fun context
     in let args2 = map (`termOfPTerm` context) args
