@@ -14,30 +14,30 @@ import Data.Char
 
 testskk :: Test
 testskk =
-    let expected = Right (tFVar "x") :: Either EvalError Term
-    in let actual = eval (tApp (tApp (tApp s [k]) [k]) [tFVar "x"]) []
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    let expected = Right (tFVar "x") :: Either String Term
+    in let actual = eval (Text.pack "") (tApp (tApp (tApp s [k]) [k]) [tFVar "x"]) []
+    in let message = "testskk: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testi :: Test
 testi =
-    let expected = Right (tFVar "x") :: Either EvalError Term
-    in let actual = eval (tApp i [tFVar "x"]) []
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    let expected = Right (tFVar "x") :: Either String Term
+    in let actual = eval (Text.pack "") (tApp i [tFVar "x"]) []
+    in let message = "testi: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testIfTrue :: Test
 testIfTrue =
-    let expected = Right (tFVar "x") :: Either EvalError Term
-    in let actual = eval (tIf tTrue (tFVar "x") (tFVar "y")) []
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    let expected = Right (tFVar "x") :: Either String Term
+    in let actual = eval (Text.pack "") (tIf tTrue (tFVar "x") (tFVar "y")) []
+    in let message = "testIfTrue: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testIfFalse :: Test
 testIfFalse =
-    let expected = Right (tFVar "y") :: Either EvalError Term
-    in let actual = eval (tIf tFalse (tFVar "x") (tFVar "y")) []
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    let expected = Right (tFVar "y") :: Either String Term
+    in let actual = eval (Text.pack "") (tIf tFalse (tFVar "x") (tFVar "y")) []
+    in let message = "testIfFalse: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testTokenize :: Test
@@ -62,7 +62,7 @@ testTokenize =
             , Rparen {rpDbg = Dbg {dStart = 60, dEnd = 61}}
             , Rparen {rpDbg = Dbg {dStart = 61, dEnd = 62}}]
     in let actual = tokenize (Text.pack "(lambda (left right) (if left (if right #true #false) #false))")
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in let message = "testTokenize: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testParseTerm :: Test
@@ -86,45 +86,45 @@ testParseTerm =
                     [ PBool {pbBool = True, pbDbg = Dbg {dStart = 64, dEnd = 69}}
                     , PBool {pbBool = True, pbDbg = Dbg {dStart = 70, dEnd = 75}}]
                 , paDbg = Dbg {dStart = 0, dEnd = 76}})
-            , []) :: (Either ParseError PTerm, [Token])
-    in let input = "((lambda (left right) (if left (if right #true #false) #false)) #true #true)"
-    in let actual = parseTerm (tokenize (Text.pack input))
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+            , []) :: (Either String PTerm, [Token])
+    in let input = Text.pack "((lambda (left right) (if left (if right #true #false) #false)) #true #true)"
+    in let actual = parseTerm input (tokenize input)
+    in let message = "testParseTerm: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testEvalStringI :: Test
 testEvalStringI =
     let expected = "Right (abs 1 (bvar 0))"
     in let actual = show (evalString "(lambda (x) x)")
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in let message = "testEvalStringI: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testEvalStringIfTrue :: Test
 testEvalStringIfTrue =
     let expected = "Right (fvar \"x\")"
     in let actual = show (evalString "(if #true x y)")
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in let message = "testEvalStringIfTrue: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testEvalStringIfFalse :: Test
 testEvalStringIfFalse =
     let expected = "Right (fvar \"x\")"
     in let actual = show (evalString "(if #true x y)")
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in let message = "testEvalStringIfFalse: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 testExtraArgs :: Test
 testExtraArgs =
-    let expected = "Left (EvalError \"apply - the function expected 1arguments, but got 2\")"
+    let expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 1):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
     in let actual = show (evalString "((lambda (x) x) y z)")
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    in let message = "testExtraArgs: an unexpected error message was returned."
     in TestCase (assertEqual message expected actual)
 
 testInvalidArgs :: Test
 testInvalidArgs =
-    let expected = "Left (ParseError \"parseApp - expected (<term> <term>*) but got something else\")"
-    in let actual = show (evalString "((lambda (x) x) ((lambda (x) x) y z)")
-    in let message = "expected " ++ show expected ++ " but got " ++ show actual
+    let expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 17):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
+    in let actual = show (evalString "((lambda (x) x) ((lambda (x) x) y z))")
+    in let message = "testInvalidArgs: an unexpected error message was returned."
     in TestCase (assertEqual message expected actual)
 
 tests = TestList
@@ -135,7 +135,9 @@ tests = TestList
     , TestLabel "testTokenize" testTokenize
     , TestLabel "testEvalStringI" testEvalStringI
     , TestLabel "testEvalStringIfTrue" testEvalStringIfTrue
-    , TestLabel "testEvalStringIfFalse" testEvalStringIfFalse]
+    , TestLabel "testEvalStringIfFalse" testEvalStringIfFalse
+    , TestLabel "testExtraArgs" testExtraArgs
+    , TestLabel "testInvalidArgs" testInvalidArgs ]
 
 main = do
     result <- runTestTT tests

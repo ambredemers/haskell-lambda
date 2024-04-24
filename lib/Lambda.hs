@@ -17,6 +17,19 @@ data Dbg = Dbg {dStart :: Int, dEnd :: Int} deriving (Eq, Show)
 emptyDbg :: Dbg
 emptyDbg = Dbg {dStart = 0, dEnd = 0}
 
+getStringAtDbg :: Text.Text -> Dbg -> Text.Text
+getStringAtDbg input (Dbg start end) = Text.take (end - start) (Text.drop start input)
+
+makeErrorString :: Text.Text -> Dbg -> String -> String
+makeErrorString input dbg@(Dbg start end) message =
+    let lexeme = Text.unpack (getStringAtDbg input dbg)
+    in let (prefix, rest) = Text.splitAt start input
+    in let prefixLines = Text.lines prefix
+    in let line = if null prefixLines then 0 else length prefixLines - 1
+    in let lastline = if null prefixLines then Text.empty else last prefixLines
+    in let column = Text.length lastline
+    -- in "error Dbg: start = " ++ show start ++ ", end = " ++ show end
+    in "Error at " ++ lexeme ++ " (line " ++ show (line + 1) ++ ", column " ++ show (column + 1) ++ "):\n\t" ++ message
 
 -- term
 data Term
@@ -60,47 +73,42 @@ tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
 
 
 -- eval/apply
-newtype EvalError = EvalError {eeMessage :: String} deriving Eq
-
-instance Show EvalError where
-    show (EvalError message) = "(EvalError " ++ show message ++ ")"
-
-eval :: Term -> [Term] -> Either EvalError Term
-eval fvar@(TFVar _ _) _ = Right fvar
-eval (TBVar index _) stack
+eval :: Text.Text -> Term -> [Term] -> Either String Term
+eval _ fvar@(TFVar _ _) _ = Right fvar
+eval input (TBVar index dbg) stack
     | index < length stack = Right (stack !! index)
-    | otherwise = Left (EvalError ("eval TBVar - invalid index" ++ show index))
-eval abs@(TAbs {}) _ = Right abs
-eval (TApp fn args dbg) stack
-    | Right fn' <- eval fn stack
-    , ([], args') <- partitionEithers (map (`eval` stack) args) =
-        apply fn' args' dbg stack
-    | Right _ <- eval fn stack
-    , (failedArgs, _) <- partitionEithers (map (`eval` stack) args) 
-        = Left (EvalError ("eval TApp - error evaluating args: " ++ show failedArgs))
-    | Left failedFn <- eval fn stack =
-        Left (EvalError ("eval TApp - error evaluating fn: " ++ show failedFn))
-eval bool@(TBool {}) _ = Right bool
-eval (TIf cond cnsq alt dbg) stack = evalIf cond cnsq alt dbg stack
+    | otherwise = Left (makeErrorString input dbg ("Could not evaluate bound variable - invalid index" ++ show index))
+eval _ abs@(TAbs {}) _ = Right abs
+eval input (TApp fn args dbg) stack
+    | Right fn' <- eval input fn stack
+    , ([], args') <- partitionEithers (map (\a -> eval input a stack) args) =
+        apply input fn' args' dbg stack
+    | Right _ <- eval input fn stack
+    , (failedArgs, _) <- partitionEithers (map (\a -> eval input a stack) args)
+        = Left (head failedArgs)
+    | Left failedFn <- eval input fn stack =
+        Left failedFn
+eval _ bool@(TBool {}) _ = Right bool
+eval input (TIf cond cnsq alt dbg) stack = evalIf input cond cnsq alt dbg stack
 
-apply :: Term -> [Term] -> Dbg -> [Term] -> Either EvalError Term
-apply abs@(TAbs arity body env _) args _ stack
-    | length env + length args == arity = eval body (reverse args ++ env ++ stack)
+apply :: Text.Text -> Term -> [Term] -> Dbg -> [Term] -> Either String Term
+apply input abs@(TAbs arity body env _) args dbg stack
+    | length env + length args == arity = eval input body (reverse args ++ env ++ stack)
     | length env + length args < arity = Right (abs {tAbsEnv = reverse args ++ env})
     | otherwise =
         let expectedArgs = arity - length env
         in let actualArgs = length env + length args
-        in Left (EvalError (
-            "apply - the function expected " ++ show expectedArgs ++ "arguments, "
+        in Left (makeErrorString input dbg (
+            "Could not evaluate function - expected " ++ show expectedArgs ++ " arguments, "
             ++ "but got " ++ show actualArgs))
-apply term _ _ _ = Left (EvalError ("apply - expected abs but got: " ++ show term))
+apply input term _ dbg _ = Left (makeErrorString input dbg ("Could not evaluate function - expected a lambda but got " ++ show term))
 
-evalIf :: Term -> Term -> Term -> Dbg -> [Term] -> Either EvalError Term
-evalIf cond cnsq alt _ stack
-    | Right (TBool True _) <- eval cond stack = eval cnsq stack
-    | Right (TBool False _) <- eval cond stack = eval alt stack
-    | Left evalError <- eval cond stack = Left evalError
-    | otherwise = Left (EvalError ("evalIf - expected boolean but got " ++ show cond))
+evalIf :: Text.Text -> Term -> Term -> Term -> Dbg -> [Term] -> Either String Term
+evalIf input cond cnsq alt dbg stack
+    | Right (TBool True _) <- eval input cond stack = eval input cnsq stack
+    | Right (TBool False _) <- eval input cond stack = eval input alt stack
+    | Left evalError <- eval input cond stack = Left evalError
+    | otherwise = Left (makeErrorString input dbg ("Could not evaluate if expression - expected a boolean as the condition but got " ++ show cond))
 
 
 -- combinators
@@ -202,11 +210,6 @@ tokenize source =
 --     | #false
 --     | (if <term> <term> <term>)
 
-newtype ParseError = ParseError {peMessage :: Text.Text} deriving Eq
-
-instance Show ParseError where
-    show (ParseError message) = "(ParseError " ++ show message ++ ")"
-
 data PTerm
     = PVar {pvName :: Text.Text, pvDbg :: Dbg}
     | PLambda {plVars :: [PTerm], plBody :: PTerm, plDbg :: Dbg}
@@ -215,66 +218,60 @@ data PTerm
     | PIf {piCond :: PTerm, piCnsq :: PTerm, piAlt :: PTerm, piDbg :: Dbg}
     deriving (Eq, Show)
 
-parseError :: String -> String -> ParseError
-parseError function expected =
-    let location = function ++ " - "
-    in let message = "expected " ++ expected ++ " but got something else"
-    in ParseError (Text.pack (location ++ message))
+parseTerm :: Text.Text -> [Token] -> (Either String PTerm, [Token])
+parseTerm input [] = (Left "Internal parsing error, token list was empty", [])
+parseTerm input (ToVar name dbg : rest) = (Right (PVar name dbg), rest)
+parseTerm input (ToTrue dbg : rest) = (Right (PBool True dbg), rest)
+parseTerm input (ToFalse dbg : rest) = (Right (PBool False dbg), rest)
+parseTerm input tokens@(Lparen _ : Lambda _ : _) = parseLambda input tokens
+parseTerm input tokens@(Lparen _ : ToIf _ : _) = parseIf input tokens
+parseTerm input tokens@(Lparen _ : _) = parseApp input tokens
 
-parseTerm :: [Token] -> (Either ParseError PTerm, [Token])
-parseTerm [] = (Left (ParseError (Text.pack "token list was empty")), [])
-parseTerm (ToVar name dbg : rest) = (Right (PVar name dbg), rest)
-parseTerm (ToTrue dbg : rest) = (Right (PBool True dbg), rest)
-parseTerm (ToFalse dbg : rest) = (Right (PBool False dbg), rest)
-parseTerm tokens@(Lparen _ : Lambda _ : _) = parseLambda tokens
-parseTerm tokens@(Lparen _ : ToIf _ : _) = parseIf tokens
-parseTerm tokens@(Lparen _ : _) = parseApp tokens
-
-parseLambda :: [Token] -> (Either ParseError PTerm, [Token])
-parseLambda tokens@(Lparen (Dbg start _) : Lambda _ : Lparen _ : rest)
-    | (Right vars, rest2) <- parseVars rest
-    , (Right body, Rparen (Dbg _ end) : rest3) <- parseTerm rest2 =
+parseLambda :: Text.Text -> [Token] -> (Either String PTerm, [Token])
+parseLambda input tokens@(Lparen (Dbg start _) : Lambda _ : Lparen _ : rest)
+    | (Right vars, rest2) <- parseVars input rest, (Right body, Rparen (Dbg _ end) : rest3) <- parseTerm input rest2 =
         (Right (PLambda vars body (Dbg start end)), rest3) -- success
-    | (Left error, _) <- parseVars rest = (Left error, tokens) -- error parsing vars
-    | (Right vars, rest2) <- parseVars rest
-    , (Right body, _) <- parseTerm rest2 =
-        (Left (parseError "parseLambda" ")"), tokens) --
-parseLambda tokens = (Left (parseError "parseLambda" "(lambda (<var>*) <term>)"), tokens)
+    | (Left error, _) <- parseVars input rest = (Left error, tokens) -- error parsing vars
+    | (Right vars, rest2) <- parseVars input rest , (Right body, _) <- parseTerm input rest2 =
+        (Left "Parsing error: expected ), but got something else", tokens) --
+parseLambda input tokens =
+    let message = "Parsing error: expected (lambda (<var>*) <term>), but got something else"
+    in (Left message, tokens)
 
-parseVars :: [Token] -> (Either ParseError [PTerm], [Token])
-parseVars tokens
+parseVars :: Text.Text -> [Token] -> (Either String [PTerm], [Token])
+parseVars input tokens
     | (vars, Rparen _ : rest) <- span isPVar tokens =
         let vars2 = map pVarOfToVar vars
         in (Right vars2, rest)
     | otherwise =
-        (Left (parseError "parseVars" ")"), tokens)
+        (Left "Parsing error: expected ), but got something else", tokens)
         where
                 pVarOfToVar (ToVar name dbg) = PVar name dbg
                 isPVar (ToVar _ _) = True
                 isPVar _ = False
 
-parseIf :: [Token] -> (Either ParseError PTerm, [Token])
-parseIf tokens@(Lparen (Dbg start _) : ToIf _ : rest)
-    | (Right cond, rest2) <- parseTerm rest
-    , (Right cnsq, rest3) <- parseTerm rest2
-    , (Right alt, Rparen (Dbg _ end) : rest4) <- parseTerm rest3 =
+parseIf :: Text.Text -> [Token] -> (Either String PTerm, [Token])
+parseIf input tokens@(Lparen (Dbg start _) : ToIf _ : rest)
+    | (Right cond, rest2) <- parseTerm input rest
+    , (Right cnsq, rest3) <- parseTerm input rest2
+    , (Right alt, Rparen (Dbg _ end) : rest4) <- parseTerm input rest3 =
         (Right (PIf cond cnsq alt (Dbg start end)), rest4)
-    | otherwise = (Left (parseError "parseIf" "(if <term> <term> <term>)"), tokens)
+    | otherwise = (Left "Parsing error: expected (if <term> <term> <term>) but got something else", tokens)
 
-parseApp :: [Token] -> (Either ParseError PTerm, [Token])
-parseApp tokens@(Lparen (Dbg start _) : rest)
-    | (Right fun, rest2) <- parseTerm rest
-    , (Right args, Rparen (Dbg _ end) : rest3) <- parseTerms rest2 =
+parseApp :: Text.Text -> [Token] -> (Either String PTerm, [Token])
+parseApp input tokens@(Lparen (Dbg start _) : rest)
+    | (Right fun, rest2) <- parseTerm input rest
+    , (Right args, Rparen (Dbg _ end) : rest3) <- parseTerms input rest2 =
         (Right (PApp fun args (Dbg start end)), rest3)
-    | otherwise = (Left (parseError "parseApp" "(<term> <term>*)"), tokens)
+    | otherwise = (Left "Parsing error: expected (<term> <term>*) but got something else", tokens)
 
-parseTerms :: [Token] -> (Either ParseError [PTerm], [Token])
-parseTerms rest@(Rparen _ : _) = (Right [], rest)
-parseTerms tokens
-    | (Right term, rest) <- parseTerm tokens
-    , (Right tail, rest2) <- parseTerms rest =
+parseTerms :: Text.Text -> [Token] -> (Either String [PTerm], [Token])
+parseTerms input rest@(Rparen _ : _) = (Right [], rest)
+parseTerms input tokens
+    | (Right term, rest) <- parseTerm input tokens
+    , (Right tail, rest2) <- parseTerms input rest =
         (Right (term : tail), rest2)
-    | otherwise = (Left (parseError "parseTerms" "<term>*"), tokens)
+    | otherwise = (Left "Parsing error: expected <term>* but got something else", tokens)
 
 termOfPTerm :: PTerm -> [Text.Text] -> Term
 termOfPTerm (PVar name dbg) context
@@ -294,23 +291,50 @@ termOfPTerm (PIf cond cnsq alt dbg) context =
     in let alt2 = termOfPTerm alt context
     in TIf cond2 cnsq2 alt2 dbg
 
-data TError
-    = TPE ParseError
-    | TEE EvalError
+data ANFExp
+    = AVal ANFVal
+    | AApp {aaName :: Text.Text, aaFun :: ANFExp, aaArgs :: [ANFVal], aaDbg :: Dbg, aaIn :: ANFExp}
+    | AIf {aiName :: Text.Text, aiCond :: ANFVal, aiCnsq :: ANFExp, aiAlt :: ANFExp, aiDbg :: Dbg, aIn :: ANFExp}
+    deriving (Eq, Show)
 
-instance Show TError where
-    show (TPE parseError) = show parseError
-    show (TEE evalError) = show evalError
+data ANFVal
+    = AVar {avName :: Text.Text, apvDbg :: Dbg}
+    | ALambda {alVars :: [ANFVal], alBody :: ANFExp, alDbg :: Dbg}
+    | ABool {abBool :: Bool, abDbg :: Dbg}
+    deriving (Eq, Show)
 
-evalString :: String -> Either TError Term
+-- = PVar {pvName :: Text.Text, pvDbg :: Dbg}
+-- | PLambda {plVars :: [PTerm], plBody :: PTerm, plDbg :: Dbg}
+-- | PApp {paFun :: PTerm, paArgs :: [PTerm], paDbg :: Dbg}
+-- | PBool {pbBool :: Bool, pbDbg :: Dbg}
+-- | PIf {piCond :: PTerm, piCnsq :: PTerm, piAlt :: PTerm, piDbg :: Dbg}
+
+-- lowerPTermToANFExp :: PTerm -> ANFExp
+-- lowerPTermToANFExp (PVar name dbg) = AVal (AVar name dbg)
+-- lowerPTermToANFExp (PLambda vars body dbg) =
+--     let args2 = map lowerPTermToANFVal vars
+--     in let body2 = lowerPTermToANFExp body
+--     in AVal (ALambda args2 body2 dbg)
+-- lowerPTermToANFExp (PApp fun args dbg) =
+-- lowerPTermToANFExp (PBool value dbg) =
+-- lowerPTermToANFExp (PIf cond cnsq alt dbg) =
+
+-- lowerPTermToANFVal :: PTerm -> ANFVal
+-- lowerPTermToANFVal = h
+-- lowerPTermToANFVal
+-- lowerPTermToANFVal
+-- lowerPTermToANFVal
+-- lowerPTermToANFVal
+
+evalString :: String -> Either String Term
 evalString input
-    | (Right term, []) <- parseTerm (tokenize (Text.pack input))
-    , Right result <- eval (termOfPTerm term []) [] =
+    | (Right term, []) <- parseTerm (Text.pack input) (tokenize (Text.pack input))
+    , Right result <- eval (Text.pack input) (termOfPTerm term []) [] =
         Right result
-    | (Right term, []) <- parseTerm (tokenize (Text.pack input))
-    , Left evalError <- eval (termOfPTerm term []) [] =
-        Left (TEE evalError)
-    | (Left parseError, _) <- parseTerm (tokenize (Text.pack input)) =
-        Left (TPE parseError)
-    | (_, _ : _) <- parseTerm (tokenize (Text.pack input)) =
-        Left (TPE (ParseError (Text.pack "evalString - unexpected input after term")))
+    | (Right term, []) <- parseTerm (Text.pack input) (tokenize (Text.pack input))
+    , Left error <- eval (Text.pack input) (termOfPTerm term []) [] =
+        Left error
+    | (Left error, _) <- parseTerm (Text.pack input) (tokenize (Text.pack input)) =
+        Left error
+    | (_, _ : _) <- parseTerm (Text.pack input) (tokenize (Text.pack input)) =
+        Left "evalString - unexpected input after term"
