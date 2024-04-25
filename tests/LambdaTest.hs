@@ -99,6 +99,13 @@ testEvalStringI =
     in let message = "testEvalStringI: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
+testEvalStringComplexLambda :: Test
+testEvalStringComplexLambda =
+    let expected = "Right (lambda (y) y)"
+    in let actual = show (evalString "((lambda (x) (x x)) ((lambda (f) (f (f (lambda (y) y)))) (lambda (x) x)))")
+    in let message = "testEvalStringComplexLambda: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
 testEvalStringIfTrue :: Test
 testEvalStringIfTrue =
     let expected = "Right x"
@@ -127,6 +134,62 @@ testInvalidArgs =
     in let message = "testInvalidArgs: an unexpected error message was returned."
     in TestCase (assertEqual message expected actual)
 
+testAdd :: Test
+testAdd =
+    let expected = "Right 58"
+    in let actual = show (evalString "(+ 100 -42)")
+    in let message = "testAdd: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testSub :: Test
+testSub =
+    let expected = "Right -3"
+    in let actual = show (evalString "(- 7 10)")
+    in let message = "testSub: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testMul :: Test
+testMul =
+    let expected = "Right 256"
+    in let actual = show (evalString "(* 16 16)")
+    in let message = "testMul: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testDiv :: Test
+testDiv =
+    let expected = "Right -3"
+    in let actual = show (evalString "(/ -51 13)")
+    in let message = "testDiv: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testAddLeftBool :: Test
+testAddLeftBool =
+    let expected = "Left \"Error at (+ #true 1) (line 1, column 1):\\n\\tCould not evaluate +, expected left argument to be an integer but got #true\""
+    in let actual = show (evalString "(+ #true 1)")
+    in let message = "testAddLeftBool: an unexpected error message was returned."
+    in TestCase (assertEqual message expected actual)
+
+testSubRightFvar :: Test
+testSubRightFvar =
+    let expected = "Left \"Error at (- 0 x) (line 1, column 1):\\n\\tCould not evaluate -, expected right argument to be an integer but got x\""
+    in let actual = show (evalString "(- 0 x)")
+    in let message = "testSubRightFvar: an unexpected error message was returned."
+    in TestCase (assertEqual message expected actual)
+
+testMulLeftError :: Test
+testMulLeftError =
+    let expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 4):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
+    in let actual = show (evalString "(* ((lambda (x) x) x y) -1)")
+    in let message = "testMulLeftError: an unexpected error message was returned."
+    in TestCase (assertEqual message expected actual)
+
+testDivRightError :: Test
+testDivRightError =
+    let expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 6):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
+    in let actual = show (evalString "(/ 2 ((lambda (x) x) x y))")
+    in let message = "testDivRightError: an unexpected error message was returned."
+    in TestCase (assertEqual message expected actual)
+
 tests = TestList
     [ TestLabel "testskk" testskk
     , TestLabel "tessti" testi
@@ -134,10 +197,19 @@ tests = TestList
     , TestLabel "testIfFalse" testIfFalse
     , TestLabel "testTokenize" testTokenize
     , TestLabel "testEvalStringI" testEvalStringI
+    , TestLabel "testEvalStringComplexLambda" testEvalStringComplexLambda
     , TestLabel "testEvalStringIfTrue" testEvalStringIfTrue
     , TestLabel "testEvalStringIfFalse" testEvalStringIfFalse
     , TestLabel "testExtraArgs" testExtraArgs
-    , TestLabel "testInvalidArgs" testInvalidArgs ]
+    , TestLabel "testInvalidArgs" testInvalidArgs
+    , TestLabel "testAdd" testAdd
+    , TestLabel "testSub" testSub
+    , TestLabel "testMul" testMul
+    , TestLabel "testDiv" testDiv
+    , TestLabel "testAddLeftBool" testAddLeftBool
+    , TestLabel "testSubRightFvar" testSubRightFvar
+    , TestLabel "testMulLeftError" testMulLeftError
+    , TestLabel "testDivRightError" testDivRightError ]
 
 main = do
     result <- runTestTT tests
