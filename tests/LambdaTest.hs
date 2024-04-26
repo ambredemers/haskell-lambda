@@ -46,15 +46,15 @@ testTokenize =
             [ Lparen {lpDbg = Dbg {dStart = 0, dEnd = 1}}
             , Lambda {laDbg = Dbg {dStart = 1, dEnd = 7}}
             , Lparen {lpDbg = Dbg {dStart = 8, dEnd = 9}}
-            , ToVar {name = Text.pack "left", toVDbg = Dbg {dStart = 9, dEnd = 13}}
-            , ToVar {name = Text.pack "right", toVDbg = Dbg {dStart = 14, dEnd = 19}}
+            , ToVar {toVName = Text.pack "left", toVDbg = Dbg {dStart = 9, dEnd = 13}}
+            , ToVar {toVName = Text.pack "right", toVDbg = Dbg {dStart = 14, dEnd = 19}}
             , Rparen {rpDbg = Dbg {dStart = 19, dEnd = 20}}
             , Lparen {lpDbg = Dbg {dStart = 21, dEnd = 22}}
             , ToIf {toIfDbg = Dbg {dStart = 22, dEnd = 24}}
-            , ToVar {name = Text.pack "left", toVDbg = Dbg {dStart = 25, dEnd = 29}}
+            , ToVar {toVName = Text.pack "left", toVDbg = Dbg {dStart = 25, dEnd = 29}}
             , Lparen {lpDbg = Dbg {dStart = 30, dEnd = 31}}
             , ToIf {toIfDbg = Dbg {dStart = 31, dEnd = 33}}
-            , ToVar {name = Text.pack "right", toVDbg = Dbg {dStart = 34, dEnd = 39}}
+            , ToVar {toVName = Text.pack "right", toVDbg = Dbg {dStart = 34, dEnd = 39}}
             , ToTrue {toTDbg = Dbg {dStart = 40, dEnd = 45}}
             , ToFalse {toFDbg = Dbg {dStart = 46, dEnd = 52}}
             , Rparen {rpDbg = Dbg {dStart = 52, dEnd = 53}}
@@ -68,27 +68,9 @@ testTokenize =
 testParseTerm :: Test
 testParseTerm =
     let expected =
-            (Right (PApp
-                { paFun = PLambda
-                    { plVars =
-                        [ PVar {pvName = Text.pack "left", pvDbg = Dbg {dStart = 10, dEnd = 14}}
-                        , PVar {pvName = Text.pack "right", pvDbg = Dbg {dStart = 15, dEnd = 20}}]
-                    , plBody = PIf
-                        { piCond = PVar {pvName = Text.pack "left", pvDbg = Dbg {dStart = 26, dEnd = 30}}
-                        , piCnsq = PIf
-                            { piCond = PVar {pvName = Text.pack "right", pvDbg = Dbg {dStart = 35, dEnd = 40}}
-                            , piCnsq = PBool {pbBool = True, pbDbg = Dbg {dStart = 41, dEnd = 46}}
-                            , piAlt = PBool {pbBool = False, pbDbg = Dbg {dStart = 47, dEnd = 53}}
-                            , piDbg = Dbg {dStart = 31, dEnd = 54}}
-                        , piAlt = PBool {pbBool = False, pbDbg = Dbg {dStart = 55, dEnd = 61}}
-                        , piDbg = Dbg {dStart = 22, dEnd = 62}}, plDbg = Dbg {dStart = 1, dEnd = 63}}
-                , paArgs =
-                    [ PBool {pbBool = True, pbDbg = Dbg {dStart = 64, dEnd = 69}}
-                    , PBool {pbBool = True, pbDbg = Dbg {dStart = 70, dEnd = 75}}]
-                , paDbg = Dbg {dStart = 0, dEnd = 76}})
-            , []) :: (Either String PTerm, [Token])
+            (Left "", []) :: (Either String Term, [Token])
     in let input = Text.pack "((lambda (left right) (if left (if right #true #false) #false)) #true #true)"
-    in let actual = parseTerm input (tokenize input)
+    in let actual = parseTerm input (tokenize input) []
     in let message = "testParseTerm: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
