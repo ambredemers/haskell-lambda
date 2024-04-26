@@ -92,6 +92,7 @@ tokenize source =
 --     | #true
 --     | #false
 --     | (if <term> <term> <term>)
+--     | <int>
 
 parseTerm :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
 parseTerm input [] context = (Left "Internal parsing error, token list was empty", [])
