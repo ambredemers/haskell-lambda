@@ -182,6 +182,7 @@ data Token
     | ToIf {toIfDbg :: Dbg}
     | ToTrue {toTDbg :: Dbg}
     | ToFalse {toFDbg :: Dbg}
+    | ToInt {toInt :: Integer, toNDbg :: Dbg}
     | ToVar {name :: Text.Text, toVDbg :: Dbg}
     deriving (Eq, Show)
 
@@ -192,6 +193,7 @@ getTokenDbg (Lambda dbg) = dbg
 getTokenDbg (ToIf dbg) = dbg
 getTokenDbg (ToTrue dbg) = dbg
 getTokenDbg (ToFalse dbg) = dbg
+getTokenDbg (ToInt _ dbg) = dbg
 getTokenDbg (ToVar _ dbg) = dbg
 
 specialChars :: [Char]
@@ -208,10 +210,13 @@ keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
     , ("#true", ToTrue)
     , ("#false", ToFalse) ]
 
-getKeywordOrVar :: Text.Text -> Dbg -> Token
-getKeywordOrVar lexeme dbg =
-    let keyword = Map.lookup lexeme keywords
-    in fromMaybe (ToVar lexeme) keyword dbg
+getTokenOfLexeme :: Text.Text -> Dbg -> Token
+getTokenOfLexeme lexeme dbg
+    | Just _ <- Regex.matchRegex (Regex.mkRegex "^-?[0-9]+$") (Text.unpack lexeme) =
+        let value = read (Text.unpack lexeme) :: Integer
+        in ToInt value dbg
+    | otherwise = let keyword = Map.lookup lexeme keywords
+        in fromMaybe (ToVar lexeme) keyword dbg
 
 skipSpaces :: Text.Text -> (Text.Text, Int)
 skipSpaces input =
@@ -233,7 +238,7 @@ getToken input dbg
     | otherwise =
         let (lexeme, rest) = Text.break (\char -> isSpecialChar char || isSpace char) input
         in let length = Text.length lexeme
-        in if length == 0 then Nothing else Just (getKeywordOrVar lexeme (dbg length), rest)
+        in if length == 0 then Nothing else Just (getTokenOfLexeme lexeme (dbg length), rest)
 
 tokenize :: Text.Text -> [Token]
 tokenize source =
@@ -260,6 +265,7 @@ data PTerm
     | PApp {paFun :: PTerm, paArgs :: [PTerm], paDbg :: Dbg}
     | PBool {pbBool :: Bool, pbDbg :: Dbg}
     | PIf {piCond :: PTerm, piCnsq :: PTerm, piAlt :: PTerm, piDbg :: Dbg}
+    | PInt {pnVal :: Integer, pnDbg :: Dbg}
     deriving (Eq, Show)
 
 parseTerm :: Text.Text -> [Token] -> (Either String PTerm, [Token])
@@ -267,6 +273,7 @@ parseTerm input [] = (Left "Internal parsing error, token list was empty", [])
 parseTerm input (ToVar name dbg : rest) = (Right (PVar name dbg), rest)
 parseTerm input (ToTrue dbg : rest) = (Right (PBool True dbg), rest)
 parseTerm input (ToFalse dbg : rest) = (Right (PBool False dbg), rest)
+parseTerm input (ToInt value dbg : rest) = (Right (PInt value dbg), rest)
 parseTerm input tokens@(Lparen _ : Lambda _ : _) = parseLambda input tokens
 parseTerm input tokens@(Lparen _ : ToIf _ : _) = parseIf input tokens
 parseTerm input tokens@(Lparen _ : _) = parseApp input tokens
@@ -319,9 +326,6 @@ parseTerms input tokens
 
 termOfPTerm :: PTerm -> [Text.Text] -> Term
 termOfPTerm (PVar name dbg) context
-    | Just _ <- Regex.matchRegex (Regex.mkRegex "^-?[0-9]+$") (Text.unpack name) =
-        let value = read (Text.unpack name) :: Integer
-        in TInt value dbg
     | (Just index) <- elemIndex name context = TBVar index name dbg
     | otherwise = TFVar name dbg
 termOfPTerm (PLambda vars body dbg) context =
@@ -337,6 +341,7 @@ termOfPTerm (PIf cond cnsq alt dbg) context =
     in let cnsq2 = termOfPTerm cnsq context
     in let alt2 = termOfPTerm alt context
     in TIf cond2 cnsq2 alt2 dbg
+termOfPTerm (PInt value dbg) context = TInt value dbg
 
 data ANFExp
     = AVal ANFVal
