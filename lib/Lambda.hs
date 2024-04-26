@@ -100,12 +100,18 @@ eval _ bool@(TBool {}) _ = Right bool
 eval input (TIf cond cnsq alt dbg) stack = evalIf input cond cnsq alt dbg stack
 eval _ int@(TInt _ _) _ = Right int
 
-intBinaryOps :: Map.HashMap Text.Text (Integer -> Integer -> Integer)
+intBinaryOps :: Map.HashMap Text.Text (Integer -> Integer -> Dbg -> Term)
 intBinaryOps = (Map.fromList . map (TupleOps.app1 Text.pack))
-    [ ("+", (+))
-    , ("-", (-))
-    , ("*", (*))
-    , ("/", quot) ]
+    [ ("+", \l r d -> TInt (l + r) d)
+    , ("-", \l r d -> TInt (l - r) d)
+    , ("*", \l r d -> TInt (l * r) d)
+    , ("/", \l r d -> TInt (quot l r) d)
+    , ("<", \l r d -> TBool (l < r) d)
+    , ("<=", \l r d -> TBool (l <= r) d)
+    , ("=", \l r d -> TBool (l == r) d)
+    , (">", \l r d -> TBool (l > r) d)
+    , (">=", \l r d -> TBool (l >= r) d)
+    , ("/=", \l r d -> TBool (l /= r) d) ]
 
 apply :: Text.Text -> Term -> [Term] -> Dbg -> [Term] -> Either String Term
 apply input abs@(TAbs arity body env _ _) args dbg stack
@@ -119,9 +125,9 @@ apply input abs@(TAbs arity body env _ _) args dbg stack
         in Left (makeErrorString input dbg message)
 apply input intBinOp@(TFVar opName _) [l, r] dbg stack
     | Map.member opName intBinaryOps
-    , Right (TInt lVal _) <- eval input l stack
-    , Right (TInt rVal _) <- eval input r stack =
-        Right (TInt ((intBinaryOps Map.! opName) lVal rVal) dbg)
+    , Right (TInt lVal (Dbg start _)) <- eval input l stack
+    , Right (TInt rVal (Dbg _ end)) <- eval input r stack =
+        Right ((intBinaryOps Map.! opName) lVal rVal (Dbg start end))
     | Map.member opName intBinaryOps
     , Right (TInt _ _) <- eval input l stack
     , Right rTerm <- eval input r stack =

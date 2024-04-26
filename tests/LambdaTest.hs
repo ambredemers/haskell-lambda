@@ -190,6 +190,48 @@ testDivRightError =
     in let message = "testDivRightError: an unexpected error message was returned."
     in TestCase (assertEqual message expected actual)
 
+testLt :: Test
+testLt =
+    let expected = "Right #false"
+    in let actual = show (evalString "(< 0 0)")
+    in let message = "testLt: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testLeq :: Test
+testLeq =
+    let expected = "Right #true"
+    in let actual = show (evalString "(<= 0 0)")
+    in let message = "testLeq: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testEq :: Test
+testEq =
+    let expected = "Right #true"
+    in let actual = show (evalString "(= 0 0)")
+    in let message = "testEq: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testGeq :: Test
+testGeq =
+    let expected = "Right #true"
+    in let actual = show (evalString "(>= 0 0)")
+    in let message = "testGeq: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testGt :: Test
+testGt =
+    let expected = "Right #false"
+    in let actual = show (evalString "(> 0 0)")
+    in let message = "testGt: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testNeq :: Test
+testNeq =
+    let expected = "Right #false"
+    in let actual = show (evalString "(/= 0 0)")
+    in let message = "testNeq: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
 tests = TestList
     [ TestLabel "testskk" testskk
     , TestLabel "tessti" testi
@@ -206,6 +248,12 @@ tests = TestList
     , TestLabel "testSub" testSub
     , TestLabel "testMul" testMul
     , TestLabel "testDiv" testDiv
+    , TestLabel "testLt" testLt
+    , TestLabel "testLeq" testLeq
+    , TestLabel "testEq" testEq
+    , TestLabel "testGeq" testGeq
+    , TestLabel "testGt" testGt
+    , TestLabel "testNeq" testNeq
     , TestLabel "testAddLeftBool" testAddLeftBool
     , TestLabel "testSubRightFvar" testSubRightFvar
     , TestLabel "testMulLeftError" testMulLeftError
