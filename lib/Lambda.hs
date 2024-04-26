@@ -54,30 +54,6 @@ instance Show Term where
     show (TIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
     show (TInt value _) = show value
 
-tFVar :: String -> Term
-tFVar name = TFVar (Text.pack name) emptyDbg
-
-tBVar :: Int -> Term
-tBVar index = TBVar index (Text.pack (show index)) emptyDbg
-
-tAbs :: Int -> Term -> Term
-tAbs arity body = TAbs arity body [] [] emptyDbg
-
-tApp :: Term -> [Term] -> Term
-tApp fn args = TApp fn args emptyDbg
-
-tTrue :: Term
-tTrue = TBool True emptyDbg
-
-tFalse :: Term
-tFalse = TBool False emptyDbg
-
-tIf :: Term -> Term -> Term -> Term
-tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
-
-tInt :: Integer -> Term
-tInt value = TInt value emptyDbg
-
 -- eval/apply
 eval :: Text.Text -> Term -> [Term] -> Either String Term
 eval _ fvar@(TFVar _ _) _ = Right fvar
@@ -152,26 +128,6 @@ evalIf input cond cnsq alt dbg stack
     | otherwise =
         let message = "Could not evaluate if expression - expected a boolean as the condition but got " ++ show cond
         in Left (makeErrorString input dbg message)
-
-
--- combinators
-s :: Term
-s = tAbs 3 (tApp (tApp (tBVar 2) [tBVar 0]) [tApp (tBVar 1) [tBVar 0]])
-
-k :: Term
-k = tAbs 2 (tBVar 1)
-
-i :: Term
-i = tAbs 1 (tBVar 0)
-
-b :: Term
-b = tAbs 3 (tApp (tBVar 2) [tApp (tBVar 1) [tBVar 0]])
-
-c :: Term
-c = tAbs 3 (tApp (tBVar 2) [tBVar 0, tBVar 1])
-
-w :: Term
-w = tAbs 2 (tApp (tBVar 1) [tBVar 0, tBVar 0])
 
 
 -- tokenizer
