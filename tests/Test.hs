@@ -1,5 +1,7 @@
 module Main where
-import Lambda
+import Term
+import Parser
+import Interpreter
 import Test.HUnit
 import qualified System.Exit as Exit
 import qualified Data.Text as Text

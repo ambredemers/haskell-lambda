@@ -1,6 +1,6 @@
 module Main where
 import Control.Monad
-import Lambda
+import Interpreter
 import System.IO
 
 main :: IO ()
