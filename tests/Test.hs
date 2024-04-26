@@ -2,10 +2,10 @@ module Main where
 import Term
 import Parser
 import Interpreter
-import Test.HUnit
+import Data.Char
 import qualified System.Exit as Exit
 import qualified Data.Text as Text
-import Data.Char
+import Test.HUnit
 
 -- term building helper functions
 tFVar :: String -> Term

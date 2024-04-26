@@ -1,16 +1,10 @@
 module Interpreter where
 import Term
 import Parser
-import Control.Exception
-import Data.Data
-import Data.List
-import Data.Char
-import Data.Maybe
+import Data.Either
 import qualified Data.HashMap.Strict as Map
-import qualified Data.HashSet as Set
 import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
-import Data.Either (partitionEithers)
 
 -- eval
 eval :: Text.Text -> Term -> [Term] -> Either String Term

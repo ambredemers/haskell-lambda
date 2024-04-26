@@ -1,16 +1,12 @@
 module Parser where
 import Term
-import Control.Exception
-import Data.Data
 import Data.List
 import Data.Char
 import Data.Maybe
 import qualified Data.HashMap.Strict as Map
-import qualified Data.HashSet as Set
 import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
 import qualified Text.Regex as Regex
-import Data.Either (partitionEithers)
 
 -- tokenizer
 data Token
