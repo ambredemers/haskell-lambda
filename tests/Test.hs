@@ -260,6 +260,20 @@ testUnit =
     in let message = "testUnit: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
+testBlockAdd :: Test
+testBlockAdd =
+    let expected = "Right 3"
+    in let actual = show (evalString "(block (let a 1) (let b 2) (+ a b))")
+    in let message = "testBlockAdd: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testBlockIfApp :: Test
+testBlockIfApp =
+    let expected = "Right a"
+    in let actual = show (evalString "(block (let f (lambda (x y z) (if x y z))) (let z #true) (let y a) (let x b) (f z y x))")
+    in let message = "testBlockIfApp: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
 tests = TestList
     [ TestLabel "testskk" testskk
     , TestLabel "tessti" testi
@@ -285,7 +299,9 @@ tests = TestList
     , TestLabel "testAddLeftBool" testAddLeftBool
     , TestLabel "testSubRightFvar" testSubRightFvar
     , TestLabel "testMulLeftError" testMulLeftError
-    , TestLabel "testDivRightError" testDivRightError ]
+    , TestLabel "testDivRightError" testDivRightError
+    , TestLabel "testBlockAdd" testBlockAdd
+    , TestLabel "testBlockIfApp" testBlockIfApp ]
 
 main = do
     result <- runTestTT tests

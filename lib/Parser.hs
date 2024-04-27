@@ -205,9 +205,11 @@ parseLet input [] context =
 -- (let <var> <term>)* <term>)  does not consume the closing right parentheses
 parseLets :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
 parseLets input tokens context
+    -- this part seems to be bugged
     | (Right term, rest) <- parseLet input tokens context
-    , (Right body, rest2) <- parseLets input tokens (tLetName term : context) = 
+    , (Right body, rest2) <- parseLets input rest (tLetName term : context) = 
         (Right (term {tLetBody = body}), rest2)
+    -- this part seems to be working
     | (Right term, rest@(Rparen _ : _)) <- parseTerm input tokens context =
         (Right term, rest)
 parseLets input (token : rest) context =
