@@ -1,37 +1,57 @@
-*************************************************************************************************
-* An interpreter for a slight extension of the untyped lambda calculus with Scheme-like syntax. *
-*************************************************************************************************
+# HaskellLambda
+An interpreter for a slight extension of the untyped lambda calculus with Scheme-like syntax using eager locally nameless terms (i.e. bound variables use de Bruijn indices, free variables use names).
 
-To run the program, install Haskell, Cabal, and the necessary dependencies, and then type:
-  cabal run HaskellLambda
 
-// TODO: give specific steps to set up environment
+## Setup
+Follow the instructions at [the Haskell Getting Started page](https://www.haskell.org/get-started/) to set up a Haskell environment, including GHCup, HLS, and Stack.  Install the following depencies:
+```
+cabal install unordered-containers --lib
+cabal install text --lib
+cabal install tuple-sop --lib
+cabal install regex-compat --lib
+cabal install HUnit --lib
+```
+
+To run the program, type:
+```
+cabal run HaskellLambda
+```
+
+To run the tests, type:
+```
+cabal test
+```
 
 The executable can be found at dist-newstyle/build/x86_64-linux/ghc-9.4.8/HaskellLambda-0.1.0.0/x/HaskellLambda/build/HaskellLambda/HaskellLambda.
 
 
-**********
-* Syntax *
-**********
+## Syntax
 
 The core syntax of the language is as follows:
+```
 <term> ::=
     | <var>
     | (lambda (<var>*) <term>)
     | (<term> <term>*)
+    | (block (let <var> <term>)* <term>)
     | #true
     | #false
     | (if <term> <term> <term>)
     | <int>
+    | ()
+```
 
-There are a few primitive functions, namely +, -, *, /, <, <=, =, >, >=, and /=.
+Variables can be any valid UTF-8 string separated by parentheses or whitespace.  There are a few primitive functions, namely +, -, *, /, <, <=, =, >, >=, and /=.  These expect two integer arguments and return either an integer or a boolean.
 
+<!-- TODO: provide examples of valid expressions -->
+<!-- TODO: explain the semantics -->
 
-****************
-* Architecture *
-****************
-- app/Main.hs contains the REPL code.
-- lib/Term.hs contains the type declarations for Dbg and Term as well and their core related functions.
-- lib/Parser.hs contains the tokenizer and parser code.
-- lib/Interpreter.hs contains the interpreter code, defined in terms of eval and apply.  It also contains a helper function to interpret a string directly, rather than a Term.
-- tests/Test.hs contains the test cases, written using the HUnit framework.
+## Architecture
+
+| File | Purpose |
+| --- | --- |
+| app/Main.hs | REPL (Read Evaluate Print Loop) |
+| lib/Term.hs | Type declarations for Dbg and Term and their core functions |
+| lib/Parser.hs | Tokenizer and parser.  The parser also handles replacing bound variables with de Bruijn indices |
+| lib/Interpreter.hs | Interpreter defined in terms of eval and apply |
+| tests/Test.hs | Test cases written using the HUnit framework. |
