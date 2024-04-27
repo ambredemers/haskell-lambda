@@ -274,6 +274,15 @@ testBlockIfApp =
     in let message = "testBlockIfApp: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
+testBlockShadowing :: Test
+testBlockShadowing =
+    let expected = "Right 1"
+    in let actual = show (evalString "(block (let a 0) (let a (+ a 1)) a)")
+    in let message = "testBlockShadowing: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+-- "(block (let a 1) (let b 2) (+ a b)" should not throw exception
+
 tests = TestList
     [ TestLabel "testskk" testskk
     , TestLabel "tessti" testi
@@ -301,7 +310,8 @@ tests = TestList
     , TestLabel "testMulLeftError" testMulLeftError
     , TestLabel "testDivRightError" testDivRightError
     , TestLabel "testBlockAdd" testBlockAdd
-    , TestLabel "testBlockIfApp" testBlockIfApp ]
+    , TestLabel "testBlockIfApp" testBlockIfApp
+    , TestLabel "testBlockShadowing" testBlockShadowing ]
 
 main = do
     result <- runTestTT tests

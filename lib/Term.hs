@@ -40,14 +40,26 @@ instance Show Term where
     show (TBVar _ name _) = Text.unpack name
     show (TAbs _ body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
     show abs@(TAbs _ _ env _ _) = "(closure (" ++ unwords (map show env)  ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
-    show (TLet val body name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")"
-    show (TApp fn args _) = "(app " ++ show fn ++ " " ++ show args ++ ")"
+    show letTerm@(TLet val body name _) = "(block " ++ showLet letTerm ++ ")"
+        where
+            showLet (TLet val body name _) =
+                "(let " ++ Text.unpack name ++ " " ++ show val ++ ")"
+                ++ " " ++ showLet body
+            showLet term = show term
+    show (TApp fn args _) = "(" ++ show fn ++ foldl (\x y -> x ++ " " ++ show y) "" args ++ ")"
     show (TBool True _) = "#true"
     show (TBool False _) = "#false"
     show (TIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
     show (TInt value _) = show value
     show (TUnit _) = "()"
-        where
-            showLet (TLet val body name _) =
-                "(let " ++ Text.unpack name ++ " " ++ show val ++ ")"
-                ++ " " ++ showLet body
+
+getTermDbg :: Term -> Dbg
+getTermDbg (TFVar _ dbg) = dbg
+getTermDbg (TBVar _ _ dbg) = dbg
+getTermDbg (TAbs _ _ _ _ dbg) = dbg
+getTermDbg (TApp _ _ dbg) = dbg
+getTermDbg (TLet _ _ _ dbg) = dbg
+getTermDbg (TBool _ dbg) = dbg
+getTermDbg (TIf _ _ _ dbg) = dbg
+getTermDbg (TInt _ dbg) = dbg
+getTermDbg (TUnit dbg) = dbg
