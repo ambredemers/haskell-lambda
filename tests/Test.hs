@@ -83,7 +83,7 @@ testTokenize :: Test
 testTokenize =
     let expected =
             [ Lparen {lpDbg = Dbg {dStart = 0, dEnd = 1}}
-            , Lambda {laDbg = Dbg {dStart = 1, dEnd = 7}}
+            , ToAbs {laDbg = Dbg {dStart = 1, dEnd = 7}}
             , Lparen {lpDbg = Dbg {dStart = 8, dEnd = 9}}
             , ToVar {toVName = Text.pack "left", toVDbg = Dbg {dStart = 9, dEnd = 13}}
             , ToVar {toVName = Text.pack "right", toVDbg = Dbg {dStart = 14, dEnd = 19}}
@@ -251,6 +251,13 @@ testNeq =
     let expected = "Right #false"
     in let actual = show (evalString "(/= 0 0)")
     in let message = "testNeq: evaluation returned an unexpected value."
+    in TestCase (assertEqual message expected actual)
+
+testUnit :: Test
+testUnit =
+    let expected = "Right ()"
+    in let actual = show (evalString "()")
+    in let message = "testUnit: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
 tests = TestList

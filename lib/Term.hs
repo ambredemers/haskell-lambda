@@ -1,7 +1,6 @@
 module Term where
 import qualified Data.Text as Text
 
-
 -- debug info
 data Dbg = Dbg {dStart :: Int, dEnd :: Int} deriving (Eq, Show)
 
@@ -22,36 +21,31 @@ makeErrorString input dbg@(Dbg start end) message =
     -- in "error Dbg: start = " ++ show start ++ ", end = " ++ show end
     in "Error at " ++ lexeme ++ " (line " ++ show (line + 1) ++ ", column " ++ show (column + 1) ++ "):\n\t" ++ message
 
+
 -- term
 data Term
     = TFVar {tFVarName :: Text.Text, tfVarDbg :: Dbg}
     | TBVar {tBvarIndex :: Int, tBVarName :: Text.Text, barDbg :: Dbg}
     | TAbs {tAbsArity :: Int, tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
-    | TApp {appFn :: Term, appArgs :: [Term], appDbg :: Dbg}
+    | TApp {tAppFn :: Term, tAppArgs :: [Term], tAppDbg :: Dbg}
+    | TLet {tLetVal :: Term, tLetName :: Text.Text, tLetDbg :: Dbg}
+    | TBlock {tBlkTerms :: [Term], lBlkDbg :: Dbg}
     | TBool {boolValue :: Bool, boolDbg :: Dbg}
     | TIf {ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg}
     | TInt {intValue :: Integer, intDbg :: Dbg}
+    | TUnit {tUnitDbg :: Dbg}
     deriving Eq
 
 instance Show Term where
     show (TFVar name _) = Text.unpack name
     show (TBVar _ name _) = Text.unpack name
-    show (TAbs _ body [] varNames _) = "(lambda (" ++ unwords (map Text.unpack varNames) ++ ") " ++ show body ++ ")"
+    show (TAbs _ body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
     show abs@(TAbs _ _ env _ _) = "(closure (" ++ unwords (map show env)  ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
+    show (TLet val name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")"
+    show (TBlock terms _) = "(block " ++ unwords (map show terms) ++ ")"
     show (TApp fn args _) = "(app " ++ show fn ++ " " ++ show args ++ ")"
     show (TBool True _) = "#true"
     show (TBool False _) = "#false"
     show (TIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
     show (TInt value _) = show value
-
-data ANFExp
-    = AVal ANFVal
-    | AApp {aaName :: Text.Text, aaFun :: ANFExp, aaArgs :: [ANFVal], aaDbg :: Dbg, aaIn :: ANFExp}
-    | AIf {aiName :: Text.Text, aiCond :: ANFVal, aiCnsq :: ANFExp, aiAlt :: ANFExp, aiDbg :: Dbg, aIn :: ANFExp}
-    deriving (Eq, Show)
-
-data ANFVal
-    = AVar {avName :: Text.Text, apvDbg :: Dbg}
-    | ALambda {alVars :: [ANFVal], alBody :: ANFExp, alDbg :: Dbg}
-    | ABool {abBool :: Bool, abDbg :: Dbg}
-    deriving (Eq, Show)
+    show (TUnit _) = "()"
