@@ -28,8 +28,7 @@ data Term
     | TBVar {tBvarIndex :: Int, tBVarName :: Text.Text, barDbg :: Dbg}
     | TAbs {tAbsArity :: Int, tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
     | TApp {tAppFn :: Term, tAppArgs :: [Term], tAppDbg :: Dbg}
-    | TLet {tLetVal :: Term, tLetName :: Text.Text, tLetDbg :: Dbg}
-    | TBlock {tBlkTerms :: [Term], lBlkDbg :: Dbg}
+    | TLet {tLetVal :: Term, tLetBody :: Term, tLetName :: Text.Text, tLetDbg :: Dbg}
     | TBool {boolValue :: Bool, boolDbg :: Dbg}
     | TIf {ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg}
     | TInt {intValue :: Integer, intDbg :: Dbg}
@@ -41,11 +40,14 @@ instance Show Term where
     show (TBVar _ name _) = Text.unpack name
     show (TAbs _ body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
     show abs@(TAbs _ _ env _ _) = "(closure (" ++ unwords (map show env)  ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
-    show (TLet val name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")"
-    show (TBlock terms _) = "(block " ++ unwords (map show terms) ++ ")"
+    show (TLet val body name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")"
     show (TApp fn args _) = "(app " ++ show fn ++ " " ++ show args ++ ")"
     show (TBool True _) = "#true"
     show (TBool False _) = "#false"
     show (TIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
     show (TInt value _) = show value
     show (TUnit _) = "()"
+        where
+            showLet (TLet val body name _) =
+                "(let " ++ Text.unpack name ++ " " ++ show val ++ ")"
+                ++ " " ++ showLet body

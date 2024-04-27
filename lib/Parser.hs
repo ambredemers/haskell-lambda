@@ -109,8 +109,7 @@ getVarName (TBVar _ name _) = name
 --     | <var>
 --     | (lambda (<var>*) <term>)
 --     | (<term> <term>*)
---     | (let <var> <term>)
---     | (block <term>*)
+--     | (block (let <var> <term>)* <term>)
 --     | #true
 --     | #false
 --     | (if <term> <term> <term>)
@@ -124,7 +123,6 @@ parseTerm input (ToFalse dbg : rest) context = (Right (TBool False dbg), rest)
 parseTerm input (ToInt value dbg : rest) context = (Right (TInt value dbg), rest)
 parseTerm input tokens@(Lparen (Dbg start _) : Rparen (Dbg end _) : rest) _ = (Right (TUnit (Dbg start end)), rest)
 parseTerm input tokens@(Lparen _ : ToAbs _ : _) context = parseLambda input tokens context
-parseTerm input tokens@(Lparen _ : ToLet _ : _) context = parseLet input tokens context
 parseTerm input tokens@(Lparen _ : ToBlock _ : _) context = parseBlock input tokens context
 parseTerm input tokens@(Lparen _ : ToIf _ : _) context = parseIf input tokens context
 parseTerm input tokens@(Lparen _ : _) context = parseApp input tokens context
@@ -136,7 +134,11 @@ parseTerms input tokens context
     | (Right term, rest) <- parseTerm input tokens context
     , (Right tail, rest2) <- parseTerms input rest  context =
         (Right (term : tail), rest2)
-    | otherwise = (Left "Parsing error: expected <term>* but got something else", tokens)
+parseTerms input (token : rest) context =
+    let message = "Parsing error: expected <term>* but got something else" ++ show token
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseTerms input [] context =
+    (Left "Parsing error: expected <term>* but reached end of file", [])
 
 -- <var>
 parseVar :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
@@ -144,8 +146,10 @@ parseVar input tokens@(ToVar name dbg : rest) context
     | (Just index) <- elemIndex name context = (Right (TBVar index name dbg), rest)
     | otherwise = (Right (TFVar name dbg), rest)
 parseVar input (token : rest) context =
-    let message = "Parsing error: expected <var>, but got " ++ show token
+    let message = "Parsing error: expected <var> but got " ++ show token
     in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseVar input [] context =
+    (Left "Parsing error: expected <var> but reached end of file", [])
 
 -- <var>*)
 parseVars :: Text.Text -> [Token] -> [Text.Text] -> (Either String [Term], [Token])
@@ -155,8 +159,10 @@ parseVars input tokens context
     , (Right vars, rest2) <- parseVars input rest context =
         (Right (varTerm : vars), rest2)
 parseVars input (token : rest) context =
-        let message = "Parsing error: expected <var> or ), but got something else"
-        in (Left (makeErrorString input (getTokenDbg token) message), rest)
+    let message = "Parsing error: expected <var> or ) but got something else"
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseVars input [] context =
+    (Left "Parsing error: expected <var> or ) but reached end of file", [])
 
 -- (lambda (<var>*) <term>)
 parseLambda :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
@@ -165,14 +171,11 @@ parseLambda input tokens@(Lparen (Dbg start _) : ToAbs _ : Lparen _ : rest) cont
     , varNames <- map getVarName vars
     , (Right body, Rparen (Dbg _ end) : rest3) <- parseTerm input rest2 (reverse varNames ++ context) =
         (Right (TAbs (length vars) body [] varNames (Dbg start end)), rest3)
-    | (Left error, _) <- parseVars input rest context = (Left error, tokens)
-    | (Right vars, rest2) <- parseVars input rest context
-    , varNames <- map getVarName vars
-    , (Right body, _) <- parseTerm input rest2 (reverse varNames ++ context) =
-        (Left "Parsing error: expected ), but got something else", tokens)
-parseLambda input tokens context =
-    let message = "Parsing error: expected (lambda (<var>*) <term>), but got something else"
-    in (Left message, tokens)
+parseLambda input (token : rest) context =
+    let message = "Parsing error: expected (lambda (<var>*) <term>) but got something else"
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseLambda input [] context =
+    (Left "Parsing error: expected (lambda (<var>*) <term>) but reached end of file", [])
 
 -- (<term> <term>*)
 parseApp :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
@@ -180,35 +183,49 @@ parseApp input tokens@(Lparen (Dbg start _) : rest) context
     | (Right fun, rest2) <- parseTerm input rest context
     , (Right args, Rparen (Dbg _ end) : rest3) <- parseTerms input rest2 context =
         (Right (TApp fun args (Dbg start end)), rest3)
-    | otherwise = (Left "Parsing error: expected (<term> <term>*) but got something else", tokens)
+parseApp input (token : rest) context =
+    let message = "Parsing error: expected (<term> <term>*) but got something else"
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseApp input [] context =
+    (Left "Parsing error: expected (<term> <term>*) but reached end of file", [])
 
 -- (let <var> <term>)
 parseLet :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
-parseLet input tokens@(Lparen (Dbg start _) : ToLet _ : Lparen _ : rest) context
-    | (Right vars, rest2) <- parseVars input rest context
-    , (Right body, Rparen (Dbg _ end) : rest3) <- parseTerm input rest2 context =
-        -- TAbs {tAbsArity :: Int, tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
-        (Right (TAbs (length vars) body [] (map getVarName vars) (Dbg start end)), rest3)
-    | (Left error, _) <- parseVars input rest context = (Left error, tokens) -- error parsing vars
-    | (Right vars, rest2) <- parseVars input rest context, (Right body, _) <- parseTerm input rest2 context =
-        (Left "Parsing error: expected ), but got something else", tokens) --
-parseLet input tokens context =
-    let message = "Parsing error: expected (let <var> <term>), but got something else"
-    in (Left message, tokens)
+parseLet input tokens@(Lparen (Dbg start _) : ToLet _ : rest) context
+    | (Right var, rest2) <- parseVar input rest context
+    , (Right value, Rparen (Dbg _ end) : rest3) <- parseTerm input rest2 (getVarName var : context) =
+        -- body is meant to be overridden, so it is a dummy value
+        (Right (TLet value (TUnit emptyDbg) (getVarName var) (Dbg start end)), rest3)
+parseLet input (token : rest) context =
+    let message = "Parsing error: expected (let <var> <term>) but got something else"
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseLet input [] context =
+    (Left "Parsing error: expected (let <var> <term>) but reached end of file", [])
 
--- (block <term>*)
+-- (let <var> <term>)* <term>)  does not consume the closing right parentheses
+parseLets :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseLets input tokens context
+    | (Right term, rest) <- parseLet input tokens context
+    , (Right body, rest2) <- parseLets input tokens (tLetName term : context) = 
+        (Right (term {tLetBody = body}), rest2)
+    | (Right term, rest@(Rparen _ : _)) <- parseTerm input tokens context =
+        (Right term, rest)
+parseLets input (token : rest) context =
+    let message = "Parsing error: expected (let <var> <term>)* <term>) but got something else"
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseLets input [] context =
+    (Left "Parsing error: expected (let <var> <term>)* <term>) but reached end of file", [])
+
+-- (block (let <var> <term>)* <term>)
 parseBlock :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
-parseBlock input tokens@(Lparen (Dbg start _) : ToAbs _ : Lparen _ : rest) context
-    | (Right vars, rest2) <- parseVars input rest context
-    , (Right body, Rparen (Dbg _ end) : rest3) <- parseTerm input rest2 context =
-        -- TAbs {tAbsArity :: Int, tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
-        (Right (TAbs (length vars) body [] (map getVarName vars) (Dbg start end)), rest3)
-    | (Left error, _) <- parseVars input rest context = (Left error, tokens) -- error parsing vars
-    | (Right vars, rest2) <- parseVars input rest context, (Right body, _) <- parseTerm input rest2 context =
-        (Left "Parsing error: expected ), but got something else", tokens) --
-parseBlock input tokens context =
-    let message = "Parsing error: expected (block <term>*), but got something else"
-    in (Left message, tokens)
+parseBlock input tokens@(Lparen (Dbg start _) : ToBlock _ : rest) context
+    | (Right term, Rparen (Dbg _ end) : rest2) <- parseLets input rest context =
+        (Right term, rest2)
+parseBlock input (token : rest) context =
+    let message = "Parsing error: expected (block <term>*) but got something else"
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseBlock input [] context =
+    (Left "Parsing error: expected (block <term>*) but reached end of file", [])
 
 -- (if <term> <term> <term>)
 parseIf :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
@@ -217,4 +234,8 @@ parseIf input tokens@(Lparen (Dbg start _) : ToIf _ : rest) context
     , (Right cnsq, rest3) <- parseTerm input rest2 context
     , (Right alt, Rparen (Dbg _ end) : rest4) <- parseTerm input rest3 context =
         (Right (TIf cond cnsq alt (Dbg start end)), rest4)
-    | otherwise = (Left "Parsing error: expected (if <term> <term> <term>) but got something else", tokens)
+parseIf input (token : rest) context =
+    let message = "Parsing error: expected (if <term> <term> <term>) but got something else"
+    in (Left (makeErrorString input (getTokenDbg token) message), rest)
+parseIf input [] context =
+    (Left "Parsing error: expected (if <term> <term> <term>) but reached end of file", [])

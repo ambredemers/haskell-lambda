@@ -24,6 +24,7 @@ eval input (TApp fn args dbg) stack
         = Left (head failedArgs)
     | Left failedFn <- eval input fn stack =
         Left failedFn
+eval input (TLet value body _ dbg) stack = eval input body (value : stack)
 eval _ bool@(TBool {}) _ = Right bool
 eval input (TIf cond cnsq alt dbg) stack = evalIf input cond cnsq alt dbg stack
 eval _ int@(TInt _ _) _ = Right int
