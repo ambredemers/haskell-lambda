@@ -3,6 +3,7 @@ import Term
 import Data.List
 import Data.Char
 import Data.Maybe
+import Data.Either.Extra
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
@@ -101,6 +102,8 @@ tokenize source =
 
 
 -- parser
+type ParserType = Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+
 getVarName :: Term -> Text.Text
 getVarName (TFVar name _) = name
 getVarName (TBVar _ name _) = name
@@ -115,7 +118,7 @@ getVarName (TBVar _ name _) = name
 --     | (if <term> <term> <term>)
 --     | <int>
 --     | ()
-parseTerm :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseTerm :: ParserType
 parseTerm input [] context = (Left "Internal parsing error, token list was empty", [])
 parseTerm input tokens@(ToVar _ _ : rest) context = parseVar input tokens context
 parseTerm input (ToTrue dbg : rest) context = (Right (TBool True dbg), rest)
@@ -126,6 +129,7 @@ parseTerm input tokens@(Lparen _ : ToAbs _ : _) context = parseLambda input toke
 parseTerm input tokens@(Lparen _ : ToBlock _ : _) context = parseBlock input tokens context
 parseTerm input tokens@(Lparen _ : ToIf _ : _) context = parseIf input tokens context
 parseTerm input tokens@(Lparen _ : _) context = parseApp input tokens context
+parseTerm input tokens _ = (Left "Internal parsing error, could not match against any rules", tokens)
 
 -- <term>*)  does not consume the closing right parentheses
 parseTerms :: Text.Text -> [Token] -> [Text.Text] -> (Either String [Term], [Token])
@@ -141,7 +145,7 @@ parseTerms input [] context =
     (Left "Parsing error: expected <term>* but reached end of file", [])
 
 -- <var>
-parseVar :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseVar :: ParserType
 parseVar input tokens@(ToVar name dbg : rest) context
     | (Just index) <- elemIndex name context = (Right (TBVar index name dbg), rest)
     | otherwise = (Right (TFVar name dbg), rest)
@@ -165,7 +169,7 @@ parseVars input [] context =
     (Left "Parsing error: expected <var> or ) but reached end of file", [])
 
 -- (lambda (<var>*) <term>)
-parseLambda :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseLambda :: ParserType
 parseLambda input tokens@(Lparen (Dbg start _) : ToAbs _ : Lparen _ : rest) context
     | (Right vars, rest2) <- parseVars input rest context
     , varNames <- map getVarName vars
@@ -178,7 +182,7 @@ parseLambda input [] context =
     (Left "Parsing error: expected (lambda (<var>*) <term>) but reached end of file", [])
 
 -- (<term> <term>*)
-parseApp :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseApp :: ParserType
 parseApp input tokens@(Lparen (Dbg start _) : rest) context
     | (Right fun, rest2) <- parseTerm input rest context
     , (Right args, Rparen (Dbg _ end) : rest3) <- parseTerms input rest2 context =
@@ -190,7 +194,7 @@ parseApp input [] context =
     (Left "Parsing error: expected (<term> <term>*) but reached end of file", [])
 
 -- (let <var> <term>)
-parseLet :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseLet :: ParserType
 parseLet input tokens@(Lparen (Dbg start _) : ToLet _ : rest) context
     | (Right var, rest2) <- parseVar input rest context
     , (Right value, Rparen (Dbg _ end) : rest3) <- parseTerm input rest2 (getVarName var : context) =
@@ -202,35 +206,41 @@ parseLet input (token : rest) context =
 parseLet input [] context =
     (Left "Parsing error: expected (let <var> <term>) but reached end of file", [])
 
--- (let <var> <term>)* <term>)  does not consume the closing right parentheses
-parseLets :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
-parseLets input tokens context
-    -- this part seems to be bugged
-    | (Right term, rest) <- parseLet input tokens context
-    , (Right body, rest2) <- parseLets input rest (tLetName term : context) = 
-        (Right (term {tLetBody = body}), rest2)
-    -- this part seems to be working
-    | (Right term, rest@(Rparen _ : _)) <- parseTerm input tokens context =
+-- does not consume the closing right parentheses
+parseExpectRparen :: ParserType -> ParserType
+parseExpectRparen parser input tokens context
+    | (Right term, rest@(Rparen _ : _)) <- parser input tokens context =
         (Right term, rest)
-parseLets input (token : rest) context =
-    let message = "Parsing error: expected (let <var> <term>)* <term>) but got something else"
-    in (Left (makeErrorString input (getTokenDbg token) message), rest)
-parseLets input [] context =
-    (Left "Parsing error: expected (let <var> <term>)* <term>) but reached end of file", [])
+    | (Right term, rest@(token : _)) <- parser input tokens context =
+        let message = "Parsing error: expected ')' but got" ++ show token
+        in let dbg = let len = Text.length input in Dbg len len
+        in (Left (makeErrorString input dbg message), rest)
+    | (Right _, []) <- parser input tokens context =
+        let message = "Parsing error: expected ')' but reached end of file"
+        in let dbg = let len = Text.length input in Dbg len len
+        in (Left (makeErrorString input dbg message), [])
+    | error@(Left _, _) <- parser input tokens context = error
+
+-- (let <var> <term>)* <term>)  does not consume the closing right parentheses
+parseLets :: ParserType
+parseLets input tokens context
+    -- (let <var> <term>) parseLets
+    | (Right term, rest) <- parseLet input tokens context
+    , result <- parseExpectRparen parseLets input rest (tLetName term : context) =
+        TupleOps.app1 (mapRight (\body -> term {tLetBody = body})) result
+    -- <term>)
+    | otherwise = parseExpectRparen parseTerm input tokens context
 
 -- (block (let <var> <term>)* <term>)
-parseBlock :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseBlock :: ParserType
 parseBlock input tokens@(Lparen (Dbg start _) : ToBlock _ : rest) context
     | (Right term, Rparen (Dbg _ end) : rest2) <- parseLets input rest context =
         (Right term, rest2)
-parseBlock input (token : rest) context =
-    let message = "Parsing error: expected (block <term>*) but got something else"
-    in (Left (makeErrorString input (getTokenDbg token) message), rest)
-parseBlock input [] context =
-    (Left "Parsing error: expected (block <term>*) but reached end of file", [])
+    | otherwise = parseExpectRparen parseLets input rest context
+parseBlock input tokens _ = (Left "", tokens)
 
 -- (if <term> <term> <term>)
-parseIf :: Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [Token])
+parseIf :: ParserType
 parseIf input tokens@(Lparen (Dbg start _) : ToIf _ : rest) context
     | (Right cond, rest2) <- parseTerm input rest context
     , (Right cnsq, rest3) <- parseTerm input rest2 context

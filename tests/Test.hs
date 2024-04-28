@@ -281,7 +281,12 @@ testBlockShadowing =
     in let message = "testBlockShadowing: evaluation returned an unexpected value."
     in TestCase (assertEqual message expected actual)
 
--- "(block (let a 1) (let b 2) (+ a b)" should not throw exception
+testBlockParseExpertRparenButEOF :: Test
+testBlockParseExpertRparenButEOF =
+    let expected = "Left \"Error at  (line 1, column 19):\\n\\tParsing error: expected ')' but reached end of file\""
+    in let actual = show (evalString "(block (let a 0) a")
+    in let message = "testBlockParseExpertRparenButEOF: an unexpected error message was returned."
+    in TestCase (assertEqual message expected actual)
 
 tests = TestList
     [ TestLabel "testskk" testskk
@@ -311,7 +316,8 @@ tests = TestList
     , TestLabel "testDivRightError" testDivRightError
     , TestLabel "testBlockAdd" testBlockAdd
     , TestLabel "testBlockIfApp" testBlockIfApp
-    , TestLabel "testBlockShadowing" testBlockShadowing ]
+    , TestLabel "testBlockShadowing" testBlockShadowing
+    , TestLabel "testBlockParseExpertRparenButEOF" testBlockParseExpertRparenButEOF ]
 
 main = do
     result <- runTestTT tests
