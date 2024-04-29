@@ -57,7 +57,7 @@ common warnings
 library lambda-lib
     exposed-modules: Term, Parser, Interpreter, ANF
     hs-source-dirs: lib
-    build-depends: base ^>=4.17.2.1, unordered-containers, text, tuple-sop, regex-compat ^>= 0.95.2.1, extra
+    build-depends: base ^>=4.17.2.1, unordered-containers, text, tuple-sop, regex-compat ^>= 0.95.2.1, extra, mtl
     default-language: Haskell2010
 
 executable HaskellLambda

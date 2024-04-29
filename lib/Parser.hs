@@ -4,6 +4,7 @@ import Data.List
 import Data.Char
 import Data.Maybe
 import Data.Either.Extra
+import Control.Monad.State.Lazy
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
@@ -69,36 +70,41 @@ getTokenOfLexeme lexeme dbg
     | otherwise = let keyword = Map.lookup lexeme keywords
         in fromMaybe (ToVar lexeme) keyword dbg
 
-skipSpaces :: Text.Text -> (Text.Text, Int)
-skipSpaces input =
-    f input 0
-    where f text index
-            | Just (head, tail) <- Text.uncons text, isSpace head = f tail (index + 1)
-            | otherwise = (text, index)
+skipSpaces :: Int -> State Text.Text Int
+skipSpaces index = do
+    input <- get
+    case Text.uncons input of
+        Just (head, tail) | isSpace head -> do { put tail; skipSpaces (index + 1) }
+        _ -> return index
 
-getToken :: Text.Text -> (Int -> Dbg) -> Maybe (Token, Text.Text)
-getToken input dbg
-    | Just ('(', rest) <- Text.uncons input = Just (Lparen (dbg 1), rest)
-    | Just (')', rest) <- Text.uncons input = Just (Rparen (dbg 1), rest)
-    | Just (char, _) <- Text.uncons input, isSpace char =
-        let (rest, skippedSpaces) = skipSpaces input
-        in let dbg2 = dbg 0
-        in let start = dStart dbg2 + skippedSpaces
-        in let dbg3 length = Dbg start (start + length)
-        in getToken rest dbg3
-    | otherwise =
-        let (lexeme, rest) = Text.break (\char -> isSpecialChar char || isSpace char) input
-        in let length = Text.length lexeme
-        in if length == 0 then Nothing else Just (getTokenOfLexeme lexeme (dbg length), rest)
+getToken :: (Int -> Dbg) -> State Text.Text (Maybe Token)
+getToken dbg = do
+    input <- get
+    case Text.uncons input of
+        Just ('(', rest) -> do { put rest; return $ Just (Lparen (dbg 1)) }
+        Just (')', rest) -> do { put rest; return $ Just (Rparen (dbg 1)) }
+        Just (char, _) | isSpace char -> do
+            skippedSpaces <- skipSpaces 0
+            let start = dStart (dbg 0) + skippedSpaces
+            getToken (\length -> Dbg start (start + length))
+        _ -> do
+            let (lexeme, rest) = Text.break (\char -> isSpecialChar char || isSpace char) input
+            put rest
+            let length = Text.length lexeme
+            if length == 0 then return Nothing else return $ Just (getTokenOfLexeme lexeme (dbg length))
+
+tokenizeLoop :: Int -> State Text.Text [Token]
+tokenizeLoop i = do
+    maybeToken <- getToken (\length -> Dbg i (i + length))
+    case maybeToken of
+        Just token -> do
+            let dbg = getTokenDbg token
+            rest <- tokenizeLoop (dEnd dbg)
+            return $ token : rest
+        Nothing -> do { return [] }
 
 tokenize :: Text.Text -> [Token]
-tokenize source =
-    f source 0
-    where f text i
-            | Just (token, rest) <- getToken text (\length -> Dbg i (i + length)) =
-                let dbg = getTokenDbg token
-                in token : f rest (dEnd dbg)
-            | otherwise = []
+tokenize = evalState (tokenizeLoop 0)
 
 
 -- parser
@@ -107,6 +113,21 @@ type ParserType = Text.Text -> [Token] -> [Text.Text] -> (Either String Term, [T
 getVarName :: Term -> Text.Text
 getVarName (TFVar name _) = name
 getVarName (TBVar _ name _) = name
+
+-- does not consume the closing right parentheses
+parseExpectRparen :: ParserType -> ParserType
+parseExpectRparen parser input tokens context
+    | (Right term, rest@(Rparen _ : _)) <- parser input tokens context =
+        (Right term, rest)
+    | (Right term, rest@(token : _)) <- parser input tokens context =
+        let message = "Parsing error: expected ')' but got" ++ show token
+        in let dbg = let len = Text.length input in Dbg len len
+        in (Left (makeErrorString input dbg message), rest)
+    | (Right _, []) <- parser input tokens context =
+        let message = "Parsing error: expected ')' but reached end of file"
+        in let dbg = let len = Text.length input in Dbg len len
+        in (Left (makeErrorString input dbg message), [])
+    | error@(Left _, _) <- parser input tokens context = error
 
 -- <term> ::=
 --     | <var>
@@ -205,21 +226,6 @@ parseLet input (token : rest) context =
     in (Left (makeErrorString input (getTokenDbg token) message), rest)
 parseLet input [] context =
     (Left "Parsing error: expected (let <var> <term>) but reached end of file", [])
-
--- does not consume the closing right parentheses
-parseExpectRparen :: ParserType -> ParserType
-parseExpectRparen parser input tokens context
-    | (Right term, rest@(Rparen _ : _)) <- parser input tokens context =
-        (Right term, rest)
-    | (Right term, rest@(token : _)) <- parser input tokens context =
-        let message = "Parsing error: expected ')' but got" ++ show token
-        in let dbg = let len = Text.length input in Dbg len len
-        in (Left (makeErrorString input dbg message), rest)
-    | (Right _, []) <- parser input tokens context =
-        let message = "Parsing error: expected ')' but reached end of file"
-        in let dbg = let len = Text.length input in Dbg len len
-        in (Left (makeErrorString input dbg message), [])
-    | error@(Left _, _) <- parser input tokens context = error
 
 -- (let <var> <term>)* <term>)  does not consume the closing right parentheses
 parseLets :: ParserType
