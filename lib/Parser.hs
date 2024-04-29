@@ -63,13 +63,12 @@ keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
     , ("#true", ToTrue)
     , ("#false", ToFalse) ]
 
-getTokenOfLexeme :: Text.Text -> Dbg -> Token
-getTokenOfLexeme lexeme dbg
-    | Just _ <- Regex.matchRegex (Regex.mkRegex "^-?[0-9]+$") (Text.unpack lexeme) =
-        let value = read (Text.unpack lexeme) :: Integer
-        in ToInt value dbg
-    | otherwise = let keyword = Map.lookup lexeme keywords
-        in fromMaybe (ToVar lexeme) keyword dbg
+getTokenOfLexeme :: Text.Text -> Int -> Token
+getTokenOfLexeme lexeme index = 
+    let dbg = Dbg index (index + Text.length lexeme)
+    in case Regex.matchRegex (Regex.mkRegex "^-?[0-9]+$") (Text.unpack lexeme) of
+        Just _ -> ToInt (read (Text.unpack lexeme)) dbg
+        _ -> fromMaybe (ToVar lexeme) (Map.lookup lexeme keywords) dbg
 
 skipSpaces :: State (Text.Text, Int) ()
 skipSpaces = do
@@ -89,7 +88,7 @@ getToken = do
             let (lexeme, rest) = Text.break (\char -> isSpecialChar char || isSpace char) input
             let length = Text.length lexeme
             put (rest, index + length)
-            return $ toMaybe (length /= 0) (getTokenOfLexeme lexeme (Dbg index (index + length)))
+            return $ toMaybe (length /= 0) (getTokenOfLexeme lexeme index)
 
 tokenizeLoop :: State (Text.Text, Int) [Token]
 tokenizeLoop = do
