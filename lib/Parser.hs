@@ -3,6 +3,7 @@ import Term
 import Data.List
 import Data.Char
 import Data.Maybe
+import Data.Maybe.HT
 import Data.Either.Extra
 import Control.Monad.State.Lazy
 import qualified Data.HashMap.Strict as Map
@@ -70,41 +71,37 @@ getTokenOfLexeme lexeme dbg
     | otherwise = let keyword = Map.lookup lexeme keywords
         in fromMaybe (ToVar lexeme) keyword dbg
 
-skipSpaces :: Int -> State Text.Text Int
-skipSpaces index = do
-    input <- get
+skipSpaces :: State (Text.Text, Int) ()
+skipSpaces = do
+    (input, index) <- get
     case Text.uncons input of
-        Just (head, tail) | isSpace head -> do { put tail; skipSpaces (index + 1) }
-        _ -> return index
+        Just (head, tail) | isSpace head -> put (tail, index + 1)
+        _ -> return ()
 
-getToken :: (Int -> Dbg) -> State Text.Text (Maybe Token)
-getToken dbg = do
-    input <- get
+getToken :: State (Text.Text, Int) (Maybe Token)
+getToken = do
+    (input, index) <- get
     case Text.uncons input of
-        Just ('(', rest) -> do { put rest; return $ Just (Lparen (dbg 1)) }
-        Just (')', rest) -> do { put rest; return $ Just (Rparen (dbg 1)) }
-        Just (char, _) | isSpace char -> do
-            skippedSpaces <- skipSpaces 0
-            let start = dStart (dbg 0) + skippedSpaces
-            getToken (\length -> Dbg start (start + length))
+        Just ('(', rest) -> do { put (rest, index + 1); return $ Just (Lparen (Dbg index (index + 1))) }
+        Just (')', rest) -> do { put (rest, index + 1); return $ Just (Rparen (Dbg index (index + 1))) }
+        Just (char, _) | isSpace char -> do { skipSpaces; getToken }
         _ -> do
             let (lexeme, rest) = Text.break (\char -> isSpecialChar char || isSpace char) input
-            put rest
             let length = Text.length lexeme
-            if length == 0 then return Nothing else return $ Just (getTokenOfLexeme lexeme (dbg length))
+            put (rest, index + length)
+            return $ toMaybe (length /= 0) (getTokenOfLexeme lexeme (Dbg index (index + length)))
 
-tokenizeLoop :: Int -> State Text.Text [Token]
-tokenizeLoop i = do
-    maybeToken <- getToken (\length -> Dbg i (i + length))
+tokenizeLoop :: State (Text.Text, Int) [Token]
+tokenizeLoop = do
+    maybeToken <- getToken
     case maybeToken of
         Just token -> do
-            let dbg = getTokenDbg token
-            rest <- tokenizeLoop (dEnd dbg)
+            rest <- tokenizeLoop
             return $ token : rest
         Nothing -> do { return [] }
 
 tokenize :: Text.Text -> [Token]
-tokenize = evalState (tokenizeLoop 0)
+tokenize source = evalState tokenizeLoop (source, 0)
 
 
 -- parser
