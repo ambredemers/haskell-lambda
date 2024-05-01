@@ -57,7 +57,7 @@ common warnings
 library lambda-lib
     exposed-modules: Term, Parser, Interpreter, ANF
     hs-source-dirs: lib
-    build-depends: base ^>=4.17.2.1, unordered-containers, text, tuple-sop, regex-compat ^>= 0.95.2.1, extra, mtl, utility-ht
+    build-depends: base ^>=4.17.2.1, unordered-containers, text, tuple-sop, regex-compat ^>= 0.95.2.1, extra, mtl, utility-ht, transformers, transformers-either
     default-language: Haskell2010
 
 executable HaskellLambda
@@ -85,6 +85,6 @@ executable HaskellLambda
 test-suite tests
     type: exitcode-stdio-1.0
     main-is: Test.hs
-    build-depends: base ^>=4.17.2.1, HUnit ^>=1.6, lambda-lib, text
+    build-depends: base ^>=4.17.2.1, HUnit ^>=1.6, lambda-lib, text, transformers, transformers-either
     hs-source-dirs: tests
     default-language: Haskell2010
