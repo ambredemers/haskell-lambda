@@ -253,7 +253,7 @@ parseLets = do
       setContext $ tLetName term : context
       result <- parseLets
       setContext context
-      return $ (\body -> term {tLetBody = body}) result
+      return $ term {tLetBody = result}
     _ -> do parseTerm
 
 -- (block (let <var> <term>)* <term>)
@@ -264,7 +264,7 @@ parseBlock = do
     Lparen (Dbg start _) : ToBlock _ : rest -> do
       setTokens rest
       result <- parseLets
-      end <- parseRparen
+      parseRparen
       return result
     _ -> parseError "(block (let <var> <term>)* <term>)"
 
