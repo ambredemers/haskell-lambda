@@ -9,6 +9,11 @@ cabal install unordered-containers --lib
 cabal install text --lib
 cabal install tuple-sop --lib
 cabal install regex-compat --lib
+cabal install extra --lib
+cabal install mtl --lib
+cabal install utility-ht --lib
+cabal install transformers --lib
+cabal install transformers-either --lib
 cabal install HUnit --lib
 ```
 
