@@ -104,11 +104,6 @@ apply input term _ dbg _ =
 -- evalString
 evalString :: String -> Either String Term
 evalString input =
-  let (result, state) = runState (runEitherT parseTerm) $ ParserState (tokenize (Text.pack input)) [] (Text.pack input)
-   in case (result, state) of
-        (Right term, ParserState [] _ _)
-          | Right result <- eval (Text.pack input) term [] -> Right result
-        (Right term, ParserState [] _ _)
-          | Left error <- eval (Text.pack input) term [] -> Left error
-        (Left error, _) -> Left error
-        (_, ParserState (_ : _) _ _) -> Left "evalString - unexpected input after term"
+  case parse (Text.pack input) of
+    Right term -> eval (Text.pack input) term []
+    Left error -> Left error
