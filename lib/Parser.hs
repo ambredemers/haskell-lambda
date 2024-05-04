@@ -304,8 +304,8 @@ bindVarsMap [] = return []
 -- wrapper around pipeline
 parse :: Text.Text -> Either String Term
 parse input =
-  let (result, state) = runState (runEitherT parseTerm) $ ParserState (tokenize input) input
+  let (result, state) = runState (runEitherT parseTerm) (ParserState (tokenize input) input)
    in case (result, state) of
-        (Right term, ParserState [] _) -> Right $ runReader (bindVars term) []
-        (Left error, _) -> Left error
-        (_, ParserState (_ : _) _) -> Left "Parsing error: unexpected input after term"
+        (Right term, ParserState [] _) -> return $ runReader (bindVars term) []
+        (Left error, _) -> throwError error
+        (_, ParserState (_ : _) _) -> throwError "Parsing error: unexpected input after term"

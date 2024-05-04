@@ -55,28 +55,28 @@ w = tAbs 2 (tApp (tBVar 1) [tBVar 0, tBVar 0])
 testskk :: Test
 testskk =
   let expected = Right (tFVar "x") :: Either String Term
-   in let actual = eval (Text.pack "") (tApp (tApp (tApp s [k]) [k]) [tFVar "x"]) []
+   in let actual = eval (tApp (tApp (tApp s [k]) [k]) [tFVar "x"]) (Text.pack "")
        in let message = "testskk: evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testi :: Test
 testi =
   let expected = Right (tFVar "x") :: Either String Term
-   in let actual = eval (Text.pack "") (tApp i [tFVar "x"]) []
+   in let actual = eval (tApp i [tFVar "x"]) (Text.pack "")
        in let message = "testi: evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testIfTrue :: Test
 testIfTrue =
   let expected = Right (tFVar "x") :: Either String Term
-   in let actual = eval (Text.pack "") (tIf tTrue (tFVar "x") (tFVar "y")) []
+   in let actual = eval (tIf tTrue (tFVar "x") (tFVar "y")) (Text.pack "")
        in let message = "testIfTrue: evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testIfFalse :: Test
 testIfFalse =
   let expected = Right (tFVar "y") :: Either String Term
-   in let actual = eval (Text.pack "") (tIf tFalse (tFVar "x") (tFVar "y")) []
+   in let actual = eval (tIf tFalse (tFVar "x") (tFVar "y")) (Text.pack "")
        in let message = "testIfFalse: evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
