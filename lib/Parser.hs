@@ -1,3 +1,5 @@
+{-# LANGUAGE Strict #-}
+
 module Parser where
 
 import Control.Monad.Except
@@ -57,8 +59,7 @@ isSpecialChar char = char == '(' || char == ')'
 
 -- TODO: add quit as a keyword
 keywords :: Map.HashMap Text.Text (Dbg -> Token)
-keywords =
-  (Map.fromList . map (TupleOps.app1 Text.pack))
+keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
     [ ("lambda", ToLambda),
       ("let", ToLet),
       ("block", ToBlock),

@@ -1,3 +1,5 @@
+{-# LANGUAGE Strict #-}
+
 module Term where
 
 import qualified Data.Text as Text
@@ -13,14 +15,14 @@ getStringAtDbg input (Dbg start end) = Text.take (end - start) (Text.drop start 
 
 makeErrorString :: Text.Text -> Dbg -> String -> String
 makeErrorString input dbg@(Dbg start end) message =
-  let lexeme = Text.unpack (getStringAtDbg input dbg)
-   in let (prefix, rest) = Text.splitAt start input
-       in let prefixLines = Text.lines prefix
-           in let line = if null prefixLines then 0 else length prefixLines - 1
-               in let lastline = if null prefixLines then Text.empty else last prefixLines
-                   in let column = Text.length lastline
-                       in -- in "error Dbg: start = " ++ show start ++ ", end = " ++ show end
-                          "Error at " ++ lexeme ++ " (line " ++ show (line + 1) ++ ", column " ++ show (column + 1) ++ "):\n\t" ++ message
+  "Error at " ++ lexeme ++ " (line " ++ show (line + 1) ++ ", column " ++ show (column + 1) ++ "):\n\t" ++ message
+  where
+    lexeme = Text.unpack (getStringAtDbg input dbg)
+    (prefix, rest) = Text.splitAt start input
+    prefixLines = Text.lines prefix
+    line = if null prefixLines then 0 else length prefixLines - 1
+    lastline = if null prefixLines then Text.empty else last prefixLines
+    column = Text.length lastline
 
 -- term
 data Term
@@ -42,14 +44,7 @@ instance Show Term where
   show abs@(TAbs _ _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
   show letTerm@(TLet val body name _) = "(block " ++ showLet letTerm ++ ")"
     where
-      showLet (TLet val body name _) =
-        "(let "
-          ++ Text.unpack name
-          ++ " "
-          ++ show val
-          ++ ")"
-          ++ " "
-          ++ showLet body
+      showLet (TLet val body name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")" ++ " " ++ showLet body
       showLet term = show term
   show (TApp fn args _) = "(" ++ show fn ++ foldl (\x y -> x ++ " " ++ show y) "" args ++ ")"
   show (TBool True _) = "#true"
