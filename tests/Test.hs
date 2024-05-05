@@ -119,175 +119,175 @@ testEvalStringI :: Test
 testEvalStringI =
   let expected = "Right (lambda (x) x)"
    in let actual = show (evalString "(lambda (x) x)")
-       in let message = "testEvalStringI: evaluation returned an unexpected value."
+       in let message = "ESvaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testEvalStringComplexLambda :: Test
 testEvalStringComplexLambda =
   let expected = "Right (lambda (y) y)"
    in let actual = show (evalString "((lambda (x) (x x)) ((lambda (f) (f (f (lambda (y) y)))) (lambda (x) x)))")
-       in let message = "testEvalStringComplexLambda: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testEvalStringIfTrue :: Test
 testEvalStringIfTrue =
   let expected = "Right x"
    in let actual = show (evalString "(if #true x y)")
-       in let message = "testEvalStringIfTrue: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testEvalStringIfFalse :: Test
 testEvalStringIfFalse =
   let expected = "Right x"
    in let actual = show (evalString "(if #true x y)")
-       in let message = "testEvalStringIfFalse: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testExtraArgs :: Test
 testExtraArgs =
   let expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 1):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
    in let actual = show (evalString "((lambda (x) x) y z)")
-       in let message = "testExtraArgs: an unexpected error message was returned."
+       in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
 testInvalidArgs :: Test
 testInvalidArgs =
   let expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 17):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
    in let actual = show (evalString "((lambda (x) x) ((lambda (x) x) y z))")
-       in let message = "testInvalidArgs: an unexpected error message was returned."
+       in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
 testAdd :: Test
 testAdd =
   let expected = "Right 58"
    in let actual = show (evalString "(+ 100 -42)")
-       in let message = "testAdd: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testSub :: Test
 testSub =
   let expected = "Right -3"
    in let actual = show (evalString "(- 7 10)")
-       in let message = "testSub: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testMul :: Test
 testMul =
   let expected = "Right 256"
    in let actual = show (evalString "(* 16 16)")
-       in let message = "testMul: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testDiv :: Test
 testDiv =
   let expected = "Right -3"
    in let actual = show (evalString "(/ -51 13)")
-       in let message = "testDiv: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testAddLeftBool :: Test
 testAddLeftBool =
   let expected = "Left \"Error at (+ #true 1) (line 1, column 1):\\n\\tCould not evaluate +, expected left argument to be an integer but got #true\""
    in let actual = show (evalString "(+ #true 1)")
-       in let message = "testAddLeftBool: an unexpected error message was returned."
+       in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
 testSubRightFvar :: Test
 testSubRightFvar =
   let expected = "Left \"Error at (- 0 x) (line 1, column 1):\\n\\tCould not evaluate -, expected right argument to be an integer but got x\""
    in let actual = show (evalString "(- 0 x)")
-       in let message = "testSubRightFvar: an unexpected error message was returned."
+       in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
 testMulLeftError :: Test
 testMulLeftError =
   let expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 4):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
    in let actual = show (evalString "(* ((lambda (x) x) x y) -1)")
-       in let message = "testMulLeftError: an unexpected error message was returned."
+       in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
 testDivRightError :: Test
 testDivRightError =
   let expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 6):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
    in let actual = show (evalString "(/ 2 ((lambda (x) x) x y))")
-       in let message = "testDivRightError: an unexpected error message was returned."
+       in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
 testLt :: Test
 testLt =
   let expected = "Right #false"
    in let actual = show (evalString "(< 0 0)")
-       in let message = "testLt: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testLeq :: Test
 testLeq =
   let expected = "Right #true"
    in let actual = show (evalString "(<= 0 0)")
-       in let message = "testLeq: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testEq :: Test
 testEq =
   let expected = "Right #true"
    in let actual = show (evalString "(= 0 0)")
-       in let message = "testEq: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testGeq :: Test
 testGeq =
   let expected = "Right #true"
    in let actual = show (evalString "(>= 0 0)")
-       in let message = "testGeq: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testGt :: Test
 testGt =
   let expected = "Right #false"
    in let actual = show (evalString "(> 0 0)")
-       in let message = "testGt: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testNeq :: Test
 testNeq =
   let expected = "Right #false"
    in let actual = show (evalString "(/= 0 0)")
-       in let message = "testNeq: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
 testUnit :: Test
 testUnit =
   let expected = "Right ()"
    in let actual = show (evalString "()")
-       in let message = "testUnit: evaluation returned an unexpected value."
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
-testBlockAdd :: Test
-testBlockAdd =
+testLetAdd :: Test
+testLetAdd =
   let expected = "Right 3"
-   in let actual = show (evalString "(block (let a 1) (let b 2) (+ a b))")
-       in let message = "testBlockAdd: evaluation returned an unexpected value."
+   in let actual = show (evalString "(let ((a 1) (b 2)) (+ a b))")
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
-testBlockIfApp :: Test
-testBlockIfApp =
+testLetIfApp :: Test
+testLetIfApp =
   let expected = "Right a"
-   in let actual = show (evalString "(block (let f (lambda (x y z) (if x y z))) (let z #true) (let y a) (let x b) (f z y x))")
-       in let message = "testBlockIfApp: evaluation returned an unexpected value."
+   in let actual = show (evalString "(let ((f (lambda (x y z) (if x y z))) (z #true) (y a) (x b)) (f z y x))")
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
-testBlockShadowing :: Test
-testBlockShadowing =
+testLetShadowing :: Test
+testLetShadowing =
   let expected = "Right 1"
-   in let actual = show (evalString "(block (let a 0) (let a (+ a 1)) a)")
-       in let message = "testBlockShadowing: evaluation returned an unexpected value."
+   in let actual = show (evalString "(let ((a 0) (a (+ a 1))) a)")
+       in let message = "Evaluation returned an unexpected value."
            in TestCase (assertEqual message expected actual)
 
-testBlockParseExpertRparenButEOF :: Test
-testBlockParseExpertRparenButEOF =
-  let expected = "Left \"Error at  (line 1, column 19):\\n\\tParsing error: expected ')' but reached end of file\""
-   in let actual = show (evalString "(block (let a 0) a")
-       in let message = "testBlockParseExpertRparenButEOF: an unexpected error message was returned."
+testLetParseExpectRparenButEOF :: Test
+testLetParseExpectRparenButEOF =
+  let expected = "Left \"Error at  (line 1, column 15):\\n\\tParsing error: expected ')' but reached end of file\""
+   in let actual = show (evalString "(let ((a 0)) a")
+       in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
 tests =
@@ -317,10 +317,10 @@ tests =
       TestLabel "testSubRightFvar" testSubRightFvar,
       TestLabel "testMulLeftError" testMulLeftError,
       TestLabel "testDivRightError" testDivRightError,
-      TestLabel "testBlockAdd" testBlockAdd,
-      TestLabel "testBlockIfApp" testBlockIfApp,
-      TestLabel "testBlockShadowing" testBlockShadowing,
-      TestLabel "testBlockParseExpertRparenButEOF" testBlockParseExpertRparenButEOF
+      TestLabel "testLetAdd" testLetAdd,
+      TestLabel "testLetIfApp" testLetIfApp,
+      TestLabel "testLetShadowing" testLetShadowing,
+      TestLabel "testLetParseExpectRparenButEOF" testLetParseExpectRparenButEOF
     ]
 
 main = do
