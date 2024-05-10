@@ -4,6 +4,7 @@ import Control.Monad.Trans.Either
 import Control.Monad.Trans.State.Strict
 import Data.Char
 import qualified Data.Text as Text
+import InterpretAnf
 import Interpreter
 import Parser
 import qualified System.Exit as Exit
@@ -281,37 +282,45 @@ testLetParseExpectRparenButEOF =
        in let message = "An unexpected error message was returned."
            in TestCase (assertEqual message expected actual)
 
+testEvalAnfStringComplexLambda :: Test
+testEvalAnfStringComplexLambda =
+  let expected = "Right (lambda (y) y)"
+   in let actual = show (evalAnfString "((lambda (x) (x x)) ((lambda (f) (f (f (lambda (y) y)))) (lambda (x) x)))")
+       in let message = "Evaluation returned an unexpected value."
+           in TestCase (assertEqual message expected actual)
+
 tests =
   TestList
-    [ TestLabel "testskk" testskk,
-      TestLabel "tessti" testi,
-      TestLabel "testIfTrue" testIfTrue,
-      TestLabel "testIfFalse" testIfFalse,
-      TestLabel "testTokenize" testTokenize,
-      TestLabel "testEvalStringI" testEvalStringI,
-      TestLabel "testEvalStringComplexLambda" testEvalStringComplexLambda,
-      TestLabel "testEvalStringIfTrue" testEvalStringIfTrue,
-      TestLabel "testEvalStringIfFalse" testEvalStringIfFalse,
-      TestLabel "testExtraArgs" testExtraArgs,
-      TestLabel "testInvalidArgs" testInvalidArgs,
-      TestLabel "testAdd" testAdd,
-      TestLabel "testSub" testSub,
-      TestLabel "testMul" testMul,
-      TestLabel "testDiv" testDiv,
-      TestLabel "testLt" testLt,
-      TestLabel "testLeq" testLeq,
-      TestLabel "testEq" testEq,
-      TestLabel "testGeq" testGeq,
-      TestLabel "testGt" testGt,
-      TestLabel "testNeq" testNeq,
-      TestLabel "testAddLeftBool" testAddLeftBool,
-      TestLabel "testSubRightFvar" testSubRightFvar,
-      TestLabel "testMulLeftError" testMulLeftError,
-      TestLabel "testDivRightError" testDivRightError,
-      TestLabel "testLetAdd" testLetAdd,
-      TestLabel "testLetIfApp" testLetIfApp,
-      TestLabel "testLetShadowing" testLetShadowing,
-      TestLabel "testLetParseExpectRparenButEOF" testLetParseExpectRparenButEOF
+    [ TestLabel "testskk" testskk
+    , TestLabel "tessti" testi
+    , TestLabel "testIfTrue" testIfTrue
+    , TestLabel "testIfFalse" testIfFalse
+    , TestLabel "testTokenize" testTokenize
+    , TestLabel "testEvalStringI" testEvalStringI
+    , TestLabel "testEvalStringComplexLambda" testEvalStringComplexLambda
+    , TestLabel "testEvalStringIfTrue" testEvalStringIfTrue
+    , TestLabel "testEvalStringIfFalse" testEvalStringIfFalse
+    , TestLabel "testExtraArgs" testExtraArgs
+    , TestLabel "testInvalidArgs" testInvalidArgs
+    , TestLabel "testAdd" testAdd
+    , TestLabel "testSub" testSub
+    , TestLabel "testMul" testMul
+    , TestLabel "testDiv" testDiv
+    , TestLabel "testLt" testLt
+    , TestLabel "testLeq" testLeq
+    , TestLabel "testEq" testEq
+    , TestLabel "testGeq" testGeq
+    , TestLabel "testGt" testGt
+    , TestLabel "testNeq" testNeq
+    , TestLabel "testAddLeftBool" testAddLeftBool
+    , TestLabel "testSubRightFvar" testSubRightFvar
+    , TestLabel "testMulLeftError" testMulLeftError
+    , TestLabel "testDivRightError" testDivRightError
+    , TestLabel "testLetAdd" testLetAdd
+    , TestLabel "testLetIfApp" testLetIfApp
+    , TestLabel "testLetShadowing" testLetShadowing
+    , TestLabel "testLetParseExpectRparenButEOF" testLetParseExpectRparenButEOF
+    , TestLabel "testEvalAnfStringComplexLambda" testEvalAnfStringComplexLambda
     ]
 
 main = do

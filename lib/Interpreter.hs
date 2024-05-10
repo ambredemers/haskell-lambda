@@ -65,6 +65,7 @@ evalIf cond cnsq alt dbg = do
   case result of
     TBool True _ -> evalTerm cnsq
     TBool False _ -> evalTerm alt
+    -- add check here
 
 -- apply
 intBinaryOps :: Map.HashMap Text.Text (Integer -> Integer -> Dbg -> EvalType Term)

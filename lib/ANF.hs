@@ -14,7 +14,7 @@ data AnfExp
   = AVal {avVal :: AnfVal}
   | ALet {aleValue :: AnfVal, aleBody :: AnfExp, aleName :: Text.Text, aleDbg :: Dbg}
   | ALetApp {alaFun :: AnfVal, alaArgs :: [AnfVal], alaBody :: AnfExp, alaName :: Text.Text, alaDbg :: Dbg}
-  | ALetIf {aiCond :: AnfVal, aiCnsq :: AnfExp, aiAlt :: AnfExp, aiBpdy :: AnfExp, aiName :: Text.Text, aifDbg :: Dbg}
+  | ALetIf {aiCond :: AnfVal, aiCnsq :: AnfExp, aiAlt :: AnfExp, aiBody :: AnfExp, aiName :: Text.Text, aifDbg :: Dbg}
   deriving (Eq)
 
 data AnfVal
@@ -28,16 +28,16 @@ data AnfVal
 
 instance Show AnfExp where
   show (AVal v) = show v
-  show (ALet value body name _) = "(letval " ++ Text.unpack name ++ " " ++ show value ++ " " ++ show body ++ ")"
+  show (ALet value body name _) = "(let " ++ Text.unpack name ++ " " ++ show value ++ " " ++ show body ++ ")"
   show (ALetApp fn args body name _) =
-    "(letapp " ++ Text.unpack name ++ " (" ++ show fn ++ " " ++ unwords (map show args) ++ ") " ++ show body ++ ")"
-  show (ALetIf cond cnsq alt body name _) = "(letif " ++ Text.unpack name ++ ifString ++ show body ++ ")"
+    "(let " ++ Text.unpack name ++ " (" ++ show fn ++ " " ++ unwords (map show args) ++ ") " ++ show body ++ ")"
+  show (ALetIf cond cnsq alt body name _) = "(let " ++ Text.unpack name ++ ifString ++ show body ++ ")"
     where
       ifString = " (if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ") "
 
 instance Show AnfVal where
-  show (AFVar name _) = "(afvar " ++ Text.unpack name ++ ")"
-  show (ABVar index name _) = "(abvar " ++ show index ++ " " ++ Text.unpack name ++ ")"
+  show (AFVar name _) = Text.unpack name
+  show (ABVar index name _) = Text.unpack name
   show (AAbs body _ vars _) = "(lambda (" ++ Text.unpack (Text.unwords vars) ++ ") " ++ show body ++ ")"
   show (ABool True _) = "#true"
   show (ABool False _) = "#false"
@@ -142,6 +142,7 @@ bindAnfValVarsMap (val : rest) = do
   val' <- bindAnfValVars val
   rest' <- bindAnfValVarsMap rest
   return $ val' : rest'
+bindAnfValVarsMap [] = return []
 
 lowerTermToAnf :: Term -> AnfExp
 lowerTermToAnf term =
