@@ -1,5 +1,5 @@
 # HaskellLambda
-An interpreter for a slight extension of the untyped lambda calculus with Scheme-like syntax using eager locally nameless terms (i.e. bound variables use de Bruijn indices, free variables use names).
+An interpreter for a slight extension of the untyped lambda calculus with Scheme-like syntax using eager locally nameless terms (i.e. bound variables use de Bruijn indices, free variables use names).  Input expressions can be interpreted directly or lowered to administrative normal form intermediate representation for interpretation.
 
 
 ## Setup
@@ -38,7 +38,7 @@ The core syntax of the language is as follows:
     | <var>
     | (lambda (<var>*) <term>)
     | (<term> <term>*)
-    | (block (let <var> <term>)* <term>)
+    | (let ((<var> <term>)*) <term>)
     | #true
     | #false
     | (if <term> <term> <term>)
@@ -59,4 +59,6 @@ Variables can be any valid UTF-8 string separated by parentheses or whitespace. 
 | lib/Term.hs | Type declarations for Dbg and Term and their core functions |
 | lib/Parser.hs | Tokenizer and parser.  The parser also handles replacing bound variables with de Bruijn indices |
 | lib/Interpreter.hs | Interpreter defined in terms of eval and apply |
-| tests/Test.hs | Test cases written using the HUnit framework. |
+| lib/ANF.hs | Type declarations for ANF expressions and functions to lower Terms to ANF and rebind variables |
+| lib/InterpretAnf.hs | Interpreter for ANF expressions defined in terms of eval and apply |
+| tests/Test.hs | Test cases written using the HUnit framework |
