@@ -34,22 +34,13 @@ tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
 
 -- combinators
 s :: Term
-s = tAbs [] (tApp (tApp (tBVar 2) [tBVar 0]) [tApp (tBVar 1) [tBVar 0]])
+s = tAbs ["x", "y", "z"] (tApp (tApp (tBVar 2) [tBVar 0]) [tApp (tBVar 1) [tBVar 0]])
 
 k :: Term
-k = tAbs [] (tBVar 1)
+k = tAbs ["x", "y"] (tBVar 1)
 
 i :: Term
-i = tAbs [] (tBVar 0)
-
-b :: Term
-b = tAbs [] (tApp (tBVar 2) [tApp (tBVar 1) [tBVar 0]])
-
-c :: Term
-c = tAbs [] (tApp (tBVar 2) [tBVar 0, tBVar 1])
-
-w :: Term
-w = tAbs [] (tApp (tBVar 1) [tBVar 0, tBVar 0])
+i = tAbs ["y"] (tBVar 0)
 
 -- tests
 testskk :: Test
