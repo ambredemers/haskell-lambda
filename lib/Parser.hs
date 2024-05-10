@@ -203,7 +203,7 @@ parseLambda = do
       let varNames = map getVarName vars
       parseRparen
       body <- parseTerm
-      TAbs (length vars) body [] varNames . Dbg start <$> parseRparen
+      TAbs body [] varNames . Dbg start <$> parseRparen
     _ -> parseError "(lambda (<var>*) <term>)"
 
 -- (<term> <term>*)
@@ -279,7 +279,7 @@ bindVars fvar@(TFVar name dbg) = do
   case elemIndex name context of
     Just index -> return $ TBVar index name dbg
     _ -> return fvar
-bindVars abs@(TAbs _ body _ varNames _) = do
+bindVars abs@(TAbs body _ varNames _) = do
   body' <- localState (reverse varNames ++) (bindVars body)
   return $ abs {tAbsBody = body'}
 bindVars (TApp fn args dbg) = do

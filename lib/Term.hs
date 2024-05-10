@@ -28,7 +28,7 @@ makeErrorString input dbg@(Dbg start end) message =
 data Term
   = TFVar {tFVarName :: Text.Text, tfVarDbg :: Dbg}
   | TBVar {tBvarIndex :: Int, tBVarName :: Text.Text, barDbg :: Dbg}
-  | TAbs {tAbsArity :: Int, tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
+  | TAbs {tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
   | TApp {tAppFn :: Term, tAppArgs :: [Term], tAppDbg :: Dbg}
   | TLet {tLetVals :: [LetBinding], tLetBody :: Term, tLetDbg :: Dbg}
   | TBool {boolValue :: Bool, boolDbg :: Dbg}
@@ -42,8 +42,8 @@ data LetBinding = LetBinding {lbValue :: Term, lbName :: Text.Text, lbDbg :: Dbg
 instance Show Term where
   show (TFVar name _) = Text.unpack name
   show (TBVar _ name _) = Text.unpack name
-  show (TAbs _ body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
-  show abs@(TAbs _ _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
+  show (TAbs body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
+  show abs@(TAbs _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
 --   show letTerm@(TLet val body name _) = "(block " ++ showLet letTerm ++ ")"
 --     where
 --       showLet (TLet val body name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")" ++ " " ++ showLet body
@@ -58,7 +58,7 @@ instance Show Term where
 getTermDbg :: Term -> Dbg
 getTermDbg (TFVar _ dbg) = dbg
 getTermDbg (TBVar _ _ dbg) = dbg
-getTermDbg (TAbs _ _ _ _ dbg) = dbg
+getTermDbg (TAbs _ _ _ dbg) = dbg
 getTermDbg (TApp _ _ dbg) = dbg
 getTermDbg (TLet _ _ dbg) = dbg
 getTermDbg (TBool _ dbg) = dbg

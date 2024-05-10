@@ -83,12 +83,12 @@ intBinaryOps =
     ]
 
 apply :: Term -> [Term] -> Dbg -> EvalType Term
-apply abs@(TAbs arity body env _ _) args dbg
-  | length env + length args == arity = localContext (\s -> reverse args ++ env ++ s) (evalTerm body)
-  | length env + length args < arity = return $ abs {tAbsEnv = reverse args ++ env}
+apply abs@(TAbs body env vars _) args dbg
+  | length env + length args == length vars = localContext (\s -> reverse args ++ env ++ s) (evalTerm body)
+  | length env + length args < length vars = return $ abs {tAbsEnv = reverse args ++ env}
   | otherwise = do EvalContext _ input <- ask; evalErrorExpected "function" expectedArgs actualArgs dbg
   where
-    expectedArgs = show (arity - length env) ++ " arguments"
+    expectedArgs = show (length vars - length env) ++ " arguments"
     actualArgs = show $ length env + length args
 apply intBinOp@(TFVar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
   EvalContext _ input <- ask

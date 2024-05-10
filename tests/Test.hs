@@ -17,8 +17,8 @@ tFVar name = TFVar (Text.pack name) emptyDbg
 tBVar :: Int -> Term
 tBVar index = TBVar index (Text.pack (show index)) emptyDbg
 
-tAbs :: Int -> Term -> Term
-tAbs arity body = TAbs arity body [] [] emptyDbg
+tAbs :: [String] -> Term -> Term
+tAbs vars body = TAbs body [] (map Text.pack vars) emptyDbg
 
 tApp :: Term -> [Term] -> Term
 tApp fn args = TApp fn args emptyDbg
@@ -34,22 +34,22 @@ tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
 
 -- combinators
 s :: Term
-s = tAbs 3 (tApp (tApp (tBVar 2) [tBVar 0]) [tApp (tBVar 1) [tBVar 0]])
+s = tAbs [] (tApp (tApp (tBVar 2) [tBVar 0]) [tApp (tBVar 1) [tBVar 0]])
 
 k :: Term
-k = tAbs 2 (tBVar 1)
+k = tAbs [] (tBVar 1)
 
 i :: Term
-i = tAbs 1 (tBVar 0)
+i = tAbs [] (tBVar 0)
 
 b :: Term
-b = tAbs 3 (tApp (tBVar 2) [tApp (tBVar 1) [tBVar 0]])
+b = tAbs [] (tApp (tBVar 2) [tApp (tBVar 1) [tBVar 0]])
 
 c :: Term
-c = tAbs 3 (tApp (tBVar 2) [tBVar 0, tBVar 1])
+c = tAbs [] (tApp (tBVar 2) [tBVar 0, tBVar 1])
 
 w :: Term
-w = tAbs 2 (tApp (tBVar 1) [tBVar 0, tBVar 0])
+w = tAbs [] (tApp (tBVar 1) [tBVar 0, tBVar 0])
 
 -- tests
 testskk :: Test
