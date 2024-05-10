@@ -5,7 +5,7 @@ import Control.Monad.Trans.State.Strict
 import Data.Char
 import qualified Data.Text as Text
 import InterpretAnf
-import Interpreter
+import InterpretTerm
 import Parser
 import qualified System.Exit as Exit
 import Term

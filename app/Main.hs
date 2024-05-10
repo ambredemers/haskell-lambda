@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Monad
-import Interpreter
+import InterpretTerm
 import InterpretAnf
 import System.IO
 

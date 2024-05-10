@@ -1,6 +1,6 @@
 {-# LANGUAGE Strict #-}
 
-module Interpreter where
+module InterpretTerm where
 
 import Control.Monad.Except
 import Control.Monad.Reader
