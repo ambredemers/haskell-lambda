@@ -20,58 +20,57 @@ import qualified Text.Regex as Regex
 
 -- tokenizer
 data Token
-  = Lparen {lpDbg :: Dbg}
-  | Rparen {rpDbg :: Dbg}
-  | ToLambda {laDbg :: Dbg}
-  | ToLet {toLetDbg :: Dbg}
-  | ToIf {toIfDbg :: Dbg}
-  | ToTrue {toTDbg :: Dbg}
-  | ToFalse {toFDbg :: Dbg}
-  | ToInt {toInt :: Integer, toNDbg :: Dbg}
-  | ToVar {toVName :: Text.Text, toVDbg :: Dbg}
+  = TokLparen {tokLpDbg :: Dbg}
+  | TokRparen {tokRpDbg :: Dbg}
+  | TokLambda {tokLambdaDbg :: Dbg}
+  | TokLet {tokLetDbg :: Dbg}
+  | TokIf {tokIfDbg :: Dbg}
+  | TokBool {tokBoolValue :: Bool, tokBoolDbg :: Dbg}
+  | TokInt {tokIntValue :: Integer, tokIntDbg :: Dbg}
+  | TokVar {tokVarName :: Text.Text, tokVarDbg :: Dbg}
   deriving (Eq)
 
 instance Show Token where
-  show (Lparen _) = "'('"
-  show (Rparen _) = "')'"
-  show (ToLambda _) = "\"\"lambda\""
-  show (ToLet _) = "\"let\""
-  show (ToIf _) = "\"if\""
-  show (ToTrue _) = "#\"true\""
-  show (ToFalse _) = "#\"false\""
-  show (ToInt value _) = show value
-  show (ToVar name _) = Text.unpack name
+  show (TokLparen _) = "'('"
+  show (TokRparen _) = "')'"
+  show (TokLambda _) = "\"\"lambda\""
+  show (TokLet _) = "\"let\""
+  show (TokIf _) = "\"if\""
+  show (TokBool True _) = "#\"true\""
+  show (TokBool False _) = "#\"false\""
+  show (TokInt value _) = show value
+  show (TokVar name _) = Text.unpack name
 
 getTokenDbg :: Token -> Dbg
-getTokenDbg (Lparen dbg) = dbg
-getTokenDbg (Rparen dbg) = dbg
-getTokenDbg (ToLambda dbg) = dbg
-getTokenDbg (ToLet dbg) = dbg
-getTokenDbg (ToIf dbg) = dbg
-getTokenDbg (ToTrue dbg) = dbg
-getTokenDbg (ToFalse dbg) = dbg
-getTokenDbg (ToInt _ dbg) = dbg
-getTokenDbg (ToVar _ dbg) = dbg
+getTokenDbg (TokLparen dbg) = dbg
+getTokenDbg (TokRparen dbg) = dbg
+getTokenDbg (TokLambda dbg) = dbg
+getTokenDbg (TokLet dbg) = dbg
+getTokenDbg (TokIf dbg) = dbg
+getTokenDbg (TokBool _ dbg) = dbg
+getTokenDbg (TokInt _ dbg) = dbg
+getTokenDbg (TokVar _ dbg) = dbg
 
 isSpecialChar :: Char -> Bool
 isSpecialChar char = char == '(' || char == ')'
 
 -- TODO: add quit as a keyword
 keywords :: Map.HashMap Text.Text (Dbg -> Token)
-keywords = (Map.fromList . map (TupleOps.app1 Text.pack))
-    [ ("lambda", ToLambda),
-      ("let", ToLet),
-      ("if", ToIf),
-      ("#true", ToTrue),
-      ("#false", ToFalse)
+keywords =
+  (Map.fromList . map (TupleOps.app1 Text.pack))
+    [ ("lambda", TokLambda),
+      ("let", TokLet),
+      ("if", TokIf),
+      ("#true", TokBool True),
+      ("#false", TokBool False)
     ]
 
 getTokenOfLexeme :: Text.Text -> Int -> Token
 getTokenOfLexeme lexeme index =
   let dbg = Dbg index (index + Text.length lexeme)
    in case Regex.matchRegex (Regex.mkRegex "^-?[0-9]+$") (Text.unpack lexeme) of
-        Just _ -> ToInt (read (Text.unpack lexeme)) dbg
-        _ -> fromMaybe (ToVar lexeme) (Map.lookup lexeme keywords) dbg
+        Just _ -> TokInt (read (Text.unpack lexeme)) dbg
+        _ -> fromMaybe (TokVar lexeme) (Map.lookup lexeme keywords) dbg
 
 type TokenizerType a = State (Text.Text, Int) a
 
@@ -86,8 +85,8 @@ getToken :: TokenizerType (Maybe Token)
 getToken = do
   (input, index) <- get
   case Text.uncons input of
-    Just ('(', rest) -> do put (rest, index + 1); return $ Just (Lparen (Dbg index (index + 1)))
-    Just (')', rest) -> do put (rest, index + 1); return $ Just (Rparen (Dbg index (index + 1)))
+    Just ('(', rest) -> do put (rest, index + 1); return $ Just (TokLparen (Dbg index (index + 1)))
+    Just (')', rest) -> do put (rest, index + 1); return $ Just (TokRparen (Dbg index (index + 1)))
     Just (char, _) | isSpace char -> do skipSpaces; getToken
     _ -> do
       let (lexeme, rest) = Text.break (\char -> char == '(' || char == ')' || isSpace char) input
@@ -113,8 +112,8 @@ data ParserState = ParserState {psTokens :: [Token], psSource :: Text.Text}
 type ParserType = EitherT String (State ParserState)
 
 getVarName :: Term -> Text.Text
-getVarName (TFVar name _) = name
-getVarName (TBVar _ name _) = name
+getVarName (TermFvar name _) = name
+getVarName (TermBvar _ name _) = name
 
 parseError :: String -> ParserType a
 parseError expected = do
@@ -131,11 +130,11 @@ getTokens = do ParserState tokens _ <- lift get; return tokens
 setTokens :: [Token] -> ParserType ()
 setTokens tokens = do lift $ modify (\s -> s {psTokens = tokens})
 
-parseRparen :: ParserType Int
-parseRparen = do
+parseTokRparen :: ParserType Int
+parseTokRparen = do
   ParserState tokens _ <- lift get
   case tokens of
-    Rparen (Dbg _ end) : rest -> do setTokens rest; return end
+    TokRparen (Dbg _ end) : rest -> do setTokens rest; return end
     _ -> parseError "')'"
 
 -- <term> ::=
@@ -152,15 +151,14 @@ parseTerm :: ParserType Term
 parseTerm = do
   ParserState tokens input <- lift get
   case tokens of
-    ToVar _ _ : _ -> parseVar
-    ToTrue dbg : rest -> do setTokens rest; return $ TBool True dbg
-    ToFalse dbg : rest -> do setTokens rest; return $ TBool False dbg
-    ToInt value dbg : rest -> do setTokens rest; return $ TInt value dbg
-    Lparen (Dbg start _) : Rparen (Dbg _ end) : rest -> do setTokens rest; return $ TUnit (Dbg start end)
-    Lparen _ : ToLambda _ : _ -> parseLambda
-    Lparen _ : ToLet _ : _ -> parseLet
-    Lparen _ : ToIf _ : _ -> parseIf
-    Lparen _ : _ -> parseApp
+    TokVar _ _ : _ -> parseVar
+    TokBool value dbg : rest -> do setTokens rest; return $ TermBool True dbg
+    TokInt value dbg : rest -> do setTokens rest; return $ TermInt value dbg
+    TokLparen (Dbg start _) : TokRparen (Dbg _ end) : rest -> do setTokens rest; return $ TermUnit (Dbg start end)
+    TokLparen _ : TokLambda _ : _ -> parseLambda
+    TokLparen _ : TokLet _ : _ -> parseLet
+    TokLparen _ : TokIf _ : _ -> parseIf
+    TokLparen _ : _ -> parseApp
     token : _ ->
       let message = "Internal parsing error, could not match against any rules" ++ show tokens
        in throwError $ makeErrorString input (getTokenDbg token) message
@@ -171,7 +169,7 @@ parseTerms :: ParserType [Term]
 parseTerms = do
   tokens <- getTokens
   case tokens of
-    Rparen _ : _ -> return []
+    TokRparen _ : _ -> return []
     _ -> do result <- parseTerm; tail <- parseTerms; return $ result : tail
 
 -- <var>
@@ -179,9 +177,9 @@ parseVar :: ParserType Term
 parseVar = do
   tokens <- getTokens
   case tokens of
-    ToVar name dbg : rest -> do
+    TokVar name dbg : rest -> do
       setTokens rest
-      return $ TFVar name dbg
+      return $ TermFvar name dbg
     _ -> parseError "<var>"
 
 -- <var>*)  does not consume the closing right parentheses
@@ -189,7 +187,7 @@ parseVars :: ParserType [Term]
 parseVars = do
   tokens <- getTokens
   case tokens of
-    Rparen _ : _ -> return []
+    TokRparen _ : _ -> return []
     _ -> do var <- parseVar; vars <- parseVars; return $ var : vars
 
 -- (lambda (<var>*) <term>)
@@ -197,13 +195,13 @@ parseLambda :: ParserType Term
 parseLambda = do
   tokens <- getTokens
   case tokens of
-    Lparen (Dbg start _) : ToLambda _ : Lparen _ : rest -> do
+    TokLparen (Dbg start _) : TokLambda _ : TokLparen _ : rest -> do
       setTokens rest
       vars <- parseVars
       let varNames = map getVarName vars
-      parseRparen
+      parseTokRparen
       body <- parseTerm
-      TAbs body [] varNames . Dbg start <$> parseRparen
+      TermAbs body [] varNames . Dbg start <$> parseTokRparen
     _ -> parseError "(lambda (<var>*) <term>)"
 
 -- (<term> <term>*)
@@ -211,11 +209,11 @@ parseApp :: ParserType Term
 parseApp = do
   tokens <- getTokens
   case tokens of
-    Lparen (Dbg start _) : rest -> do
+    TokLparen (Dbg start _) : rest -> do
       setTokens rest
       fun <- parseTerm
       args <- parseTerms
-      TApp fun args . Dbg start <$> parseRparen
+      TermApp fun args . Dbg start <$> parseTokRparen
     _ -> parseError "(<term> <term>*)"
 
 -- (let (<binding>*) <term>)
@@ -223,11 +221,11 @@ parseLet :: ParserType Term
 parseLet = do
   tokens <- getTokens
   case tokens of
-    Lparen (Dbg start _) : ToLet _ : Lparen _ : rest -> do
+    TokLparen (Dbg start _) : TokLet _ : TokLparen _ : rest -> do
       setTokens rest
       letBindings <- parseLetBindings
       body <- parseTerm
-      TLet letBindings body . Dbg start <$> parseRparen
+      TermLet letBindings body . Dbg start <$> parseTokRparen
     _ -> parseError "(let <var> <term>)"
 
 -- (<var> <term>)
@@ -235,13 +233,13 @@ parseLetBinding :: ParserType LetBinding
 parseLetBinding = do
   tokens <- getTokens
   case tokens of
-    Lparen (Dbg start _) : rest -> do
+    TokLparen (Dbg start _) : rest -> do
       setTokens rest
       var <- parseVar
       value <- parseTerm
-      end <- parseRparen
+      end <- parseTokRparen
       let dbg = Dbg start end
-      return $ LetBinding value (tFVarName var) dbg
+      return $ LetBinding value (tFvarName var) dbg
     _ -> parseError "(<var> <term>)"
 
 -- <binding>*)
@@ -249,11 +247,11 @@ parseLetBindings :: ParserType [LetBinding]
 parseLetBindings = do
   tokens <- getTokens
   case tokens of
-    Lparen _ : _ -> do
+    TokLparen _ : _ -> do
       head <- parseLetBinding
       tail <- parseLetBindings
       return $ head : tail
-    Rparen _ : rest -> do setTokens rest; return []
+    TokRparen _ : rest -> do setTokens rest; return []
     _ -> parseError "(<var> <term>)*)"
 
 -- (if <term> <term> <term>)
@@ -261,12 +259,12 @@ parseIf :: ParserType Term
 parseIf = do
   tokens <- getTokens
   case tokens of
-    Lparen (Dbg start _) : ToIf _ : rest -> do
+    TokLparen (Dbg start _) : TokIf _ : rest -> do
       setTokens rest
       cond <- parseTerm
       cnsq <- parseTerm
       alt <- parseTerm
-      TIf cond cnsq alt . Dbg start <$> parseRparen
+      TermIf cond cnsq alt . Dbg start <$> parseTokRparen
     _ -> parseError "(if <term> <term> <term>)"
 
 -- replace bound variables with indices
@@ -274,28 +272,28 @@ localState :: ([Text.Text] -> [Text.Text]) -> State [Text.Text] Term -> State [T
 localState f binder = do state <- get; modify f; result <- binder; put state; return result
 
 bindVars :: Term -> State [Text.Text] Term
-bindVars fvar@(TFVar name dbg) = do
+bindVars fvar@(TermFvar name dbg) = do
   context <- get
   case elemIndex name context of
-    Just index -> return $ TBVar index name dbg
+    Just index -> return $ TermBvar index name dbg
     _ -> return fvar
-bindVars abs@(TAbs body _ varNames _) = do
+bindVars abs@(TermAbs body _ varNames _) = do
   body' <- localState (reverse varNames ++) (bindVars body)
   return $ abs {tAbsBody = body'}
-bindVars (TApp fn args dbg) = do
+bindVars (TermApp fn args dbg) = do
   fn' <- bindVars fn
   args' <- bindVarsMap args
-  return $ TApp fn' args' dbg
-bindVars (TLet letVals body dbg) = do
+  return $ TermApp fn' args' dbg
+bindVars (TermLet letVals body dbg) = do
   context <- get
   letVals' <- bindLetVals letVals
   body' <- bindVars body
-  return $ TLet letVals' body' dbg
-bindVars (TIf cond cnsq alt dbg) = do
+  return $ TermLet letVals' body' dbg
+bindVars (TermIf cond cnsq alt dbg) = do
   cond' <- bindVars cond
   cnsq' <- bindVars cnsq
   alt' <- bindVars alt
-  return $ TIf cond' cnsq' alt' dbg
+  return $ TermIf cond' cnsq' alt' dbg
 bindVars t = return t
 
 bindVarsMap :: [Term] -> State [Text.Text] [Term]

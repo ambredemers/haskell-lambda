@@ -14,12 +14,12 @@ import Parser
 import Term
 
 -- eval
-data EvalContext = EvalContext {esStack :: [Term], esSource :: Text.Text}
+data EvalContext = EvalContext {ecStack :: [Term], ecSource :: Text.Text}
 
 type EvalType = EitherT String (Reader EvalContext)
 
 localContext :: ([Term] -> [Term]) -> EvalType a -> EvalType a
-localContext f e = do EvalContext stack _ <- ask; local (\s -> s {esStack = f stack}) e
+localContext f e = do EvalContext stack _ <- ask; local (\s -> s {ecStack = f stack}) e
 
 evalError :: String -> String -> Dbg -> EvalType a
 evalError e message dbg = do
@@ -29,28 +29,29 @@ evalError e message dbg = do
 
 evalErrorExpected :: String -> String -> String -> Dbg -> EvalType a
 evalErrorExpected location expected actual = evalError location message
-  where message = "expected " ++ expected ++ ", but got " ++ actual
+  where
+    message = "expected " ++ expected ++ ", but got " ++ actual
 
 evalTerm :: Term -> EvalType Term
-evalTerm fvar@(TFVar _ _) = return fvar
-evalTerm (TBVar index _ dbg) = do
+evalTerm fvar@(TermFvar _ _) = return fvar
+evalTerm (TermBvar index _ dbg) = do
   EvalContext stack input <- ask
   if index < length stack
     then return $ stack !! index
     else evalError "bound variable" ("invalid index " ++ show index) dbg
-evalTerm abs@(TAbs {}) = return abs
-evalTerm (TApp fn args dbg) = do
+evalTerm abs@(TermAbs {}) = return abs
+evalTerm (TermApp fn args dbg) = do
   EvalContext _ input <- ask
   fn' <- evalTerm fn
   args' <- evalTerms args
   apply fn' args' dbg
-evalTerm tlet@(TLet (LetBinding value _ _ : rest) body _) = do
+evalTerm tlet@(TermLet (LetBinding value _ _ : rest) body _) = do
   value' <- evalTerm value
-  localContext (value' :) (evalTerm (tlet {tLetVals = rest}))
-evalTerm tlet@(TLet [] body _) = evalTerm body
-evalTerm bool@(TBool {}) = return bool
-evalTerm (TIf cond cnsq alt dbg) = evalIf cond cnsq alt dbg
-evalTerm int@(TInt _ _) = return int
+  localContext (value' :) (evalTerm (tlet {tLetBindings = rest}))
+evalTerm tlet@(TermLet [] body _) = evalTerm body
+evalTerm bool@(TermBool {}) = return bool
+evalTerm (TermIf cond cnsq alt dbg) = evalIf cond cnsq alt dbg
+evalTerm int@(TermInt _ _) = return int
 
 evalTerms :: [Term] -> EvalType [Term]
 evalTerms (term : rest) = do
@@ -63,45 +64,45 @@ evalIf :: Term -> Term -> Term -> Dbg -> EvalType Term
 evalIf cond cnsq alt dbg = do
   result <- evalTerm cond
   case result of
-    TBool True _ -> evalTerm cnsq
-    TBool False _ -> evalTerm alt
-    -- add check here
+    TermBool True _ -> evalTerm cnsq
+    TermBool False _ -> evalTerm alt
+    term -> evalErrorExpected "if expression" "condition to be a boolean" (show term) (getTermDbg term)
 
 -- apply
 intBinaryOps :: Map.HashMap Text.Text (Integer -> Integer -> Dbg -> EvalType Term)
 intBinaryOps =
   (Map.fromList . map (TupleOps.app1 Text.pack))
-    [ ("+", \l r d -> return $ TInt (l + r) d),
-      ("-", \l r d -> return $ TInt (l - r) d),
-      ("*", \l r d -> return $ TInt (l * r) d),
-      ("/", \l r d -> return $ TInt (quot l r) d),
-      ("<", \l r d -> return $ TBool (l < r) d),
-      ("<=", \l r d -> return $ TBool (l <= r) d),
-      ("=", \l r d -> return $ TBool (l == r) d),
-      (">", \l r d -> return $ TBool (l > r) d),
-      (">=", \l r d -> return $ TBool (l >= r) d),
-      ("/=", \l r d -> return $ TBool (l /= r) d)
+    [ ("+", \l r d -> return $ TermInt (l + r) d),
+      ("-", \l r d -> return $ TermInt (l - r) d),
+      ("*", \l r d -> return $ TermInt (l * r) d),
+      ("/", \l r d -> return $ TermInt (quot l r) d),
+      ("<", \l r d -> return $ TermBool (l < r) d),
+      ("<=", \l r d -> return $ TermBool (l <= r) d),
+      ("=", \l r d -> return $ TermBool (l == r) d),
+      (">", \l r d -> return $ TermBool (l > r) d),
+      (">=", \l r d -> return $ TermBool (l >= r) d),
+      ("/=", \l r d -> return $ TermBool (l /= r) d)
     ]
 
 apply :: Term -> [Term] -> Dbg -> EvalType Term
-apply abs@(TAbs body env vars _) args dbg
+apply abs@(TermAbs body env vars _) args dbg
   | length env + length args == length vars = localContext (\s -> reverse args ++ env ++ s) (evalTerm body)
   | length env + length args < length vars = return $ abs {tAbsEnv = reverse args ++ env}
   | otherwise = do EvalContext _ input <- ask; evalErrorExpected "function" expectedArgs actualArgs dbg
   where
     expectedArgs = show (length vars - length env) ++ " arguments"
     actualArgs = show $ length env + length args
-apply intBinOp@(TFVar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
+apply intBinOp@(TermFvar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
   EvalContext _ input <- ask
   l' <- evalTerm l
   r' <- evalTerm r
   case (l', r') of
-    (TInt lVal (Dbg start _), TInt rVal (Dbg _ end)) ->
+    (TermInt lVal (Dbg start _), TermInt rVal (Dbg _ end)) ->
       (intBinaryOps Map.! opName) lVal rVal (Dbg start end)
-    (TInt _ _, rTerm) ->
+    (TermInt _ _, rTerm) ->
       let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected right argument to be an integer but got " ++ show rTerm
        in throwError $ makeErrorString input dbg message
-    (lTerm, TInt _ _) ->
+    (lTerm, TermInt _ _) ->
       let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected left argument to be an integer but got " ++ show lTerm
        in throwError $ makeErrorString input dbg message
 apply term _ dbg = do

@@ -13,25 +13,25 @@ import Test.HUnit
 
 -- term building helper functions
 tFVar :: String -> Term
-tFVar name = TFVar (Text.pack name) emptyDbg
+tFVar name = TermFvar (Text.pack name) emptyDbg
 
 tBVar :: Int -> Term
-tBVar index = TBVar index (Text.pack (show index)) emptyDbg
+tBVar index = TermBvar index (Text.pack (show index)) emptyDbg
 
 tAbs :: [String] -> Term -> Term
-tAbs vars body = TAbs body [] (map Text.pack vars) emptyDbg
+tAbs vars body = TermAbs body [] (map Text.pack vars) emptyDbg
 
 tApp :: Term -> [Term] -> Term
-tApp fn args = TApp fn args emptyDbg
+tApp fn args = TermApp fn args emptyDbg
 
 tTrue :: Term
-tTrue = TBool True emptyDbg
+tTrue = TermBool True emptyDbg
 
 tFalse :: Term
-tFalse = TBool False emptyDbg
+tFalse = TermBool False emptyDbg
 
 tIf :: Term -> Term -> Term -> Term
-tIf cond cnsq alt = TIf cond cnsq alt emptyDbg
+tIf cond cnsq alt = TermIf cond cnsq alt emptyDbg
 
 -- combinators
 s :: Term
@@ -76,24 +76,24 @@ testTokenize :: Test
 testTokenize = TestCase (assertEqual message expected actual)
   where
     expected =
-      [ Lparen {lpDbg = Dbg {dStart = 0, dEnd = 1}},
-        ToLambda {laDbg = Dbg {dStart = 1, dEnd = 7}},
-        Lparen {lpDbg = Dbg {dStart = 8, dEnd = 9}},
-        ToVar {toVName = Text.pack "left", toVDbg = Dbg {dStart = 9, dEnd = 13}},
-        ToVar {toVName = Text.pack "right", toVDbg = Dbg {dStart = 14, dEnd = 19}},
-        Rparen {rpDbg = Dbg {dStart = 19, dEnd = 20}},
-        Lparen {lpDbg = Dbg {dStart = 21, dEnd = 22}},
-        ToIf {toIfDbg = Dbg {dStart = 22, dEnd = 24}},
-        ToVar {toVName = Text.pack "left", toVDbg = Dbg {dStart = 25, dEnd = 29}},
-        Lparen {lpDbg = Dbg {dStart = 30, dEnd = 31}},
-        ToIf {toIfDbg = Dbg {dStart = 31, dEnd = 33}},
-        ToVar {toVName = Text.pack "right", toVDbg = Dbg {dStart = 34, dEnd = 39}},
-        ToTrue {toTDbg = Dbg {dStart = 40, dEnd = 45}},
-        ToFalse {toFDbg = Dbg {dStart = 46, dEnd = 52}},
-        Rparen {rpDbg = Dbg {dStart = 52, dEnd = 53}},
-        ToFalse {toFDbg = Dbg {dStart = 54, dEnd = 60}},
-        Rparen {rpDbg = Dbg {dStart = 60, dEnd = 61}},
-        Rparen {rpDbg = Dbg {dStart = 61, dEnd = 62}}
+      [ TokLparen {tokLpDbg = Dbg {dStart = 0, dEnd = 1}},
+        TokLambda {tokLambdaDbg = Dbg {dStart = 1, dEnd = 7}},
+        TokLparen {tokLpDbg = Dbg {dStart = 8, dEnd = 9}},
+        TokVar {tokVarName = Text.pack "left", tokVarDbg = Dbg {dStart = 9, dEnd = 13}},
+        TokVar {tokVarName = Text.pack "right", tokVarDbg = Dbg {dStart = 14, dEnd = 19}},
+        TokRparen {tokRpDbg = Dbg {dStart = 19, dEnd = 20}},
+        TokLparen {tokLpDbg = Dbg {dStart = 21, dEnd = 22}},
+        TokIf {tokIfDbg = Dbg {dStart = 22, dEnd = 24}},
+        TokVar {tokVarName = Text.pack "left", tokVarDbg = Dbg {dStart = 25, dEnd = 29}},
+        TokLparen {tokLpDbg = Dbg {dStart = 30, dEnd = 31}},
+        TokIf {tokIfDbg = Dbg {dStart = 31, dEnd = 33}},
+        TokVar {tokVarName = Text.pack "right", tokVarDbg = Dbg {dStart = 34, dEnd = 39}},
+        TokBool {tokBoolValue = True, tokBoolDbg = Dbg {dStart = 40, dEnd = 45}},
+        TokBool {tokBoolValue = False, tokBoolDbg = Dbg {dStart = 46, dEnd = 52}},
+        TokRparen {tokRpDbg = Dbg {dStart = 52, dEnd = 53}},
+        TokBool {tokBoolValue = False, tokBoolDbg = Dbg {dStart = 54, dEnd = 60}},
+        TokRparen {tokRpDbg = Dbg {dStart = 60, dEnd = 61}},
+        TokRparen {tokRpDbg = Dbg {dStart = 61, dEnd = 62}}
       ]
     actual = tokenize (Text.pack "(lambda (left right) (if left (if right #true #false) #false))")
     message = "testTokenize: evaluation returned an unexpected value."

@@ -26,42 +26,42 @@ makeErrorString input dbg@(Dbg start end) message =
 
 -- term
 data Term
-  = TFVar {tFVarName :: Text.Text, tfVarDbg :: Dbg}
-  | TBVar {tBvarIndex :: Int, tBVarName :: Text.Text, barDbg :: Dbg}
-  | TAbs {tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
-  | TApp {tAppFn :: Term, tAppArgs :: [Term], tAppDbg :: Dbg}
-  | TLet {tLetVals :: [LetBinding], tLetBody :: Term, tLetDbg :: Dbg}
-  | TBool {boolValue :: Bool, boolDbg :: Dbg}
-  | TIf {ifCond :: Term, ifCnsq :: Term, ifAlt :: Term, ifDbg :: Dbg}
-  | TInt {intValue :: Integer, intDbg :: Dbg}
-  | TUnit {tUnitDbg :: Dbg}
-  deriving Eq
+  = TermFvar {tFvarName :: Text.Text, tFvarDbg :: Dbg}
+  | TermBvar {tBvarIndex :: Int, tBvarName :: Text.Text, tBvarDbg :: Dbg}
+  | TermAbs {tAbsBody :: Term, tAbsEnv :: [Term], tAbsVarNames :: [Text.Text], tAbsDbg :: Dbg}
+  | TermBool {tBoolValue :: Bool, tBoolDbg :: Dbg}
+  | TermInt {tIntValue :: Integer, tIntDbg :: Dbg}
+  | TermUnit {tUnitDbg :: Dbg}
+  | TermApp {tAppFn :: Term, tAppArgs :: [Term], tAppDbg :: Dbg}
+  | TermLet {tLetBindings :: [LetBinding], tLetBody :: Term, tLetDbg :: Dbg}
+  | TermIf {tIfCond :: Term, tIfCnsq :: Term, tIfAlt :: Term, tIfDbg :: Dbg}
+  deriving (Eq)
 
-data LetBinding = LetBinding {lbValue :: Term, lbName :: Text.Text, lbDbg :: Dbg} deriving Eq
+data LetBinding = LetBinding {lbValue :: Term, lbName :: Text.Text, lbDbg :: Dbg} deriving (Eq)
 
 instance Show Term where
-  show (TFVar name _) = Text.unpack name
-  show (TBVar _ name _) = Text.unpack name
-  show (TAbs body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
-  show abs@(TAbs _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
---   show letTerm@(TLet val body name _) = "(block " ++ showLet letTerm ++ ")"
---     where
---       showLet (TLet val body name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")" ++ " " ++ showLet body
---       showLet term = show term
-  show (TApp fn args _) = "(" ++ show fn ++ foldl (\x y -> x ++ " " ++ show y) "" args ++ ")"
-  show (TBool True _) = "#true"
-  show (TBool False _) = "#false"
-  show (TIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
-  show (TInt value _) = show value
-  show (TUnit _) = "()"
+  show (TermFvar name _) = Text.unpack name
+  show (TermBvar _ name _) = Text.unpack name
+  show (TermAbs body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
+  show abs@(TermAbs _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
+  --   show letTerm@(TLet val body name _) = "(block " ++ showLet letTerm ++ ")"
+  --     where
+  --       showLet (TLet val body name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")" ++ " " ++ showLet body
+  --       showLet term = show term
+  show (TermApp fn args _) = "(" ++ show fn ++ foldl (\x y -> x ++ " " ++ show y) "" args ++ ")"
+  show (TermBool True _) = "#true"
+  show (TermBool False _) = "#false"
+  show (TermIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
+  show (TermInt value _) = show value
+  show (TermUnit _) = "()"
 
 getTermDbg :: Term -> Dbg
-getTermDbg (TFVar _ dbg) = dbg
-getTermDbg (TBVar _ _ dbg) = dbg
-getTermDbg (TAbs _ _ _ dbg) = dbg
-getTermDbg (TApp _ _ dbg) = dbg
-getTermDbg (TLet _ _ dbg) = dbg
-getTermDbg (TBool _ dbg) = dbg
-getTermDbg (TIf _ _ _ dbg) = dbg
-getTermDbg (TInt _ dbg) = dbg
-getTermDbg (TUnit dbg) = dbg
+getTermDbg (TermFvar _ dbg) = dbg
+getTermDbg (TermBvar _ _ dbg) = dbg
+getTermDbg (TermAbs _ _ _ dbg) = dbg
+getTermDbg (TermApp _ _ dbg) = dbg
+getTermDbg (TermLet _ _ dbg) = dbg
+getTermDbg (TermBool _ dbg) = dbg
+getTermDbg (TermIf _ _ _ dbg) = dbg
+getTermDbg (TermInt _ dbg) = dbg
+getTermDbg (TermUnit dbg) = dbg
