@@ -41,13 +41,12 @@ evalAnfExp (AnfLetApp fn args body name dbg) = do
   args' <- evalAnfVals args
   result <- applyAnf fn' args' dbg
   localContext (result :) (evalAnfExp body)
-evalAnfExp (AnfLetIf cond cnsq alt body _ dbg) = do
+evalAnfExp (AnfIf cond cnsq alt dbg) = do
   cond' <- evalAnfVal cond
-  result <- case cond' of
+  case cond' of
     AnfBool True _ -> evalAnfExp cnsq
     AnfBool False _ -> evalAnfExp alt
     val -> evalErrorExpected "if expression" "condition to be a boolean" (show val) dbg
-  localContext (result :) (evalAnfExp body)
 
 evalAnfVal :: AnfVal -> AnfEvalType AnfVal
 evalAnfVal (AnfBvar index _ dbg) = do

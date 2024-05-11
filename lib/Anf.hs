@@ -14,7 +14,7 @@ data AnfExp
   = AnfValue {aValVal :: AnfVal}
   | AnfLet {aLetValue :: AnfVal, aLetBody :: AnfExp, aLetName :: Text.Text, aLetDbg :: Dbg}
   | AnfLetApp {aLetAppFun :: AnfVal, aLetAppArgs :: [AnfVal], aLetAppBody :: AnfExp, aLetAppName :: Text.Text, aLetAppDbg :: Dbg}
-  | AnfLetIf {aIfCond :: AnfVal, aIfCnsq :: AnfExp, aIfAlt :: AnfExp, aIfBody :: AnfExp, aIfName :: Text.Text, aIfDbg :: Dbg}
+  | AnfIf {aIfCond :: AnfVal, aIfCnsq :: AnfExp, aIfAlt :: AnfExp, aIfDbg :: Dbg}
   deriving (Eq)
 
 data AnfVal
@@ -31,9 +31,7 @@ instance Show AnfExp where
   show (AnfLet value body name _) = "(let " ++ Text.unpack name ++ " " ++ show value ++ " " ++ show body ++ ")"
   show (AnfLetApp fn args body name _) =
     "(let " ++ Text.unpack name ++ " (" ++ show fn ++ " " ++ unwords (map show args) ++ ") " ++ show body ++ ")"
-  show (AnfLetIf cond cnsq alt body name _) = "(let " ++ Text.unpack name ++ ifString ++ show body ++ ")"
-    where
-      ifString = " (if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ") "
+  show (AnfIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
 
 instance Show AnfVal where
   show (AnfFvar name _) = Text.unpack name
@@ -83,7 +81,7 @@ lowerTermToAnfVal (TermIf cond cnsq alt dbg) = do
   (cond', binder) <- lowerTermToAnfVal cond
   cnsq' <- lowerTermToAnfExp cnsq
   alt' <- lowerTermToAnfExp alt
-  return (AnfFvar name dbg, \body -> binder $ AnfLetIf cond' cnsq' alt' body name dbg)
+  return (AnfFvar name dbg, \body -> binder $ AnfIf cond' cnsq' alt' dbg)
 lowerTermToAnfVal (TermInt value dbg) = return (AnfInt value dbg, id)
 lowerTermToAnfVal (TermUnit dbg) = return (AnfUnit dbg, id)
 
@@ -114,12 +112,11 @@ bindAnfExpVars (AnfLetApp fn args next name dbg) = do
   args' <- bindAnfValVarsMap args
   next' <- local (name :) (bindAnfExpVars next)
   return $ AnfLetApp fn' args' next' name dbg
-bindAnfExpVars (AnfLetIf cond cnsq alt next name dbg) = do
+bindAnfExpVars (AnfIf cond cnsq alt dbg) = do
   cond' <- bindAnfValVars cond
   cnsq' <- bindAnfExpVars cnsq
   alt' <- bindAnfExpVars alt
-  next' <- local (name :) (bindAnfExpVars next)
-  return $ AnfLetIf cond' cnsq' alt' next' name dbg
+  return $ AnfIf cond' cnsq' alt' dbg
 
 bindAnfValVars :: AnfVal -> Reader [Text.Text] AnfVal
 bindAnfValVars (AnfFvar name dbg) = do
