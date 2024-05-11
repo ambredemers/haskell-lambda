@@ -37,23 +37,23 @@ data Term
   | TermIf {tIfCond :: Term, tIfCnsq :: Term, tIfAlt :: Term, tIfDbg :: Dbg}
   deriving (Eq)
 
-data LetBinding = LetBinding {lbValue :: Term, lbName :: Text.Text, lbDbg :: Dbg} deriving (Eq)
-
 instance Show Term where
   show (TermFvar name _) = Text.unpack name
   show (TermBvar _ name _) = Text.unpack name
   show (TermAbs body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
   show abs@(TermAbs _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
-  --   show letTerm@(TLet val body name _) = "(block " ++ showLet letTerm ++ ")"
-  --     where
-  --       showLet (TLet val body name _) = "(let " ++ Text.unpack name ++ " " ++ show val ++ ")" ++ " " ++ showLet body
-  --       showLet term = show term
+  show tLet@(TermLet bindings body _) = "(let (" ++ unwords (map show bindings) ++ ") " ++ show body ++ ")"
   show (TermApp fn args _) = "(" ++ show fn ++ foldl (\x y -> x ++ " " ++ show y) "" args ++ ")"
   show (TermBool True _) = "#true"
   show (TermBool False _) = "#false"
   show (TermIf cond cnsq alt _) = "(if " ++ show cond ++ " " ++ show cnsq ++ " " ++ show alt ++ ")"
   show (TermInt value _) = show value
   show (TermUnit _) = "()"
+
+data LetBinding = LetBinding {lbValue :: Term, lbName :: Text.Text, lbDbg :: Dbg} deriving (Eq)
+
+instance Show LetBinding where
+  show (LetBinding value name _) = "(" ++ Text.unpack name ++ " " ++ show value ++ ")"
 
 getTermDbg :: Term -> Dbg
 getTermDbg (TermFvar _ dbg) = dbg
