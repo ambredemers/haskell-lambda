@@ -52,13 +52,14 @@ extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
 common warnings
-    ghc-options: -Wall
+    ghc-options: -Wall -Werror
 
 library lambda-lib
     exposed-modules: Term, Parser, InterpretTerm, Anf, InterpretAnf
     hs-source-dirs: lib
     build-depends: base ^>=4.17.2.1, unordered-containers, text, tuple-sop, regex-compat ^>= 0.95.2.1, extra, mtl, utility-ht, transformers, transformers-either
     default-language: Haskell2010
+    ghc-options: -Wall -Werror
 
 executable HaskellLambda
     -- Import common warning flags.
@@ -81,6 +82,7 @@ executable HaskellLambda
 
     -- Base language which the package is written in.
     default-language: Haskell2010
+    ghc-options: -Wall -Werror
 
 test-suite tests
     type: exitcode-stdio-1.0
@@ -88,3 +90,4 @@ test-suite tests
     build-depends: base ^>=4.17.2.1, HUnit ^>=1.6, lambda-lib, text, transformers, transformers-either
     hs-source-dirs: tests
     default-language: Haskell2010
+    ghc-options: -Wall -Werror

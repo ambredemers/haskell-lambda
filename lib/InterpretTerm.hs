@@ -5,8 +5,6 @@ module InterpretTerm where
 import Control.Monad.Except
 import Control.Monad.Reader
 import Control.Monad.Trans.Either
-import Control.Monad.Trans.State.Strict
-import Data.Either
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
@@ -24,7 +22,7 @@ localContext f e = do EvalContext stack _ <- ask; local (\s -> s {ecStack = f st
 evalError :: String -> String -> Dbg -> EvalType a
 evalError e message dbg = do
   EvalContext _ input <- ask
-  let message' = "Could not evaluate " ++ e ++ " - " ++ message
+  let message' = "Could not evaluate " ++ e ++ "; " ++ message
   throwError (makeErrorString input dbg message')
 
 evalErrorExpected :: String -> String -> String -> Dbg -> EvalType a
@@ -35,23 +33,23 @@ evalErrorExpected location expected actual = evalError location message
 evalTerm :: Term -> EvalType Term
 evalTerm fvar@(TermFvar _ _) = return fvar
 evalTerm (TermBvar index _ dbg) = do
-  EvalContext stack input <- ask
+  EvalContext stack _ <- ask
   if index < length stack
     then return $ stack !! index
     else evalError "bound variable" ("invalid index " ++ show index) dbg
-evalTerm abs@(TermAbs {}) = return abs
+evalTerm tAbs@(TermAbs {}) = return tAbs
 evalTerm (TermApp fn args dbg) = do
-  EvalContext _ input <- ask
   fn' <- evalTerm fn
   args' <- evalTerms args
   apply fn' args' dbg
-evalTerm tlet@(TermLet (LetBinding value _ _ : rest) body _) = do
+evalTerm tlet@(TermLet (LetBinding value _ _ : rest) _ _) = do
   value' <- evalTerm value
   localContext (value' :) (evalTerm (tlet {tLetBindings = rest}))
-evalTerm tlet@(TermLet [] body _) = evalTerm body
+evalTerm (TermLet [] body _) = evalTerm body
 evalTerm bool@(TermBool {}) = return bool
 evalTerm (TermIf cond cnsq alt dbg) = evalIf cond cnsq alt dbg
 evalTerm int@(TermInt _ _) = return int
+evalTerm term = evalError "evaluating term" ("got an unexpected term " ++ show term) (getTermDbg term)
 
 evalTerms :: [Term] -> EvalType [Term]
 evalTerms (term : rest) = do
@@ -61,7 +59,7 @@ evalTerms (term : rest) = do
 evalTerms [] = return []
 
 evalIf :: Term -> Term -> Term -> Dbg -> EvalType Term
-evalIf cond cnsq alt dbg = do
+evalIf cond cnsq alt _ = do
   result <- evalTerm cond
   case result of
     TermBool True _ -> evalTerm cnsq
@@ -85,30 +83,23 @@ intBinaryOps =
     ]
 
 apply :: Term -> [Term] -> Dbg -> EvalType Term
-apply abs@(TermAbs body env vars _) args dbg
+apply tAbs@(TermAbs body env vars _) args dbg
   | length env + length args == length vars = localContext (\s -> reverse args ++ env ++ s) (evalTerm body)
-  | length env + length args < length vars = return $ abs {tAbsEnv = reverse args ++ env}
-  | otherwise = do EvalContext _ input <- ask; evalErrorExpected "function" expectedArgs actualArgs dbg
+  | length env + length args < length vars = return $ tAbs {tAbsEnv = reverse args ++ env}
+  | otherwise = do EvalContext _ _ <- ask; evalErrorExpected "function" expectedArgs actualArgs dbg
   where
     expectedArgs = show (length vars - length env) ++ " arguments"
     actualArgs = show $ length env + length args
-apply intBinOp@(TermFvar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
-  EvalContext _ input <- ask
+apply (TermFvar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
   l' <- evalTerm l
   r' <- evalTerm r
   case (l', r') of
     (TermInt lVal (Dbg start _), TermInt rVal (Dbg _ end)) ->
       (intBinaryOps Map.! opName) lVal rVal (Dbg start end)
-    (TermInt _ _, rTerm) ->
-      let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected right argument to be an integer but got " ++ show rTerm
-       in throwError $ makeErrorString input dbg message
-    (lTerm, TermInt _ _) ->
-      let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected left argument to be an integer but got " ++ show lTerm
-       in throwError $ makeErrorString input dbg message
-apply term _ dbg = do
-  EvalContext _ input <- ask
-  let message = "Could not evaluate function - expected a lambda or primitive function but got " ++ show term
-  throwError $ makeErrorString input dbg message
+    (TermInt _ _, rTerm) -> evalErrorExpected (Text.unpack opName) "right argument to be an integer" (show rTerm) dbg
+    (lTerm, TermInt _ _) -> evalErrorExpected (Text.unpack opName) "left argument to be an integer" (show lTerm) dbg
+    (lTerm, rTerm) -> evalErrorExpected (Text.unpack opName) "argument to be integers" (show lTerm ++ " and " ++ show rTerm) dbg
+apply term _ dbg = evalErrorExpected "function" "a lambda or primitive function" (show term) dbg
 
 eval :: Term -> Text.Text -> Either String Term
 eval term input =
@@ -116,6 +107,4 @@ eval term input =
 
 -- evalString
 evalString :: String -> Either String Term
-evalString input = do
-  term <- parse (Text.pack input)
-  eval term (Text.pack input)
+evalString input = do term <- parse (Text.pack input); eval term (Text.pack input)

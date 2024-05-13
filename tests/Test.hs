@@ -1,8 +1,5 @@
 module Main where
 
-import Control.Monad.Trans.Either
-import Control.Monad.Trans.State.Strict
-import Data.Char
 import qualified Data.Text as Text
 import InterpretAnf
 import InterpretTerm
@@ -138,14 +135,14 @@ testEvalStringIfFalse = TestCase (assertEqual message expected actual)
 testExtraArgs :: Test
 testExtraArgs = TestCase (assertEqual message expected actual)
   where
-    expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 1):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
+    expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 1):\\n\\tCould not evaluate function; expected 1 arguments, but got 2\""
     actual = show (evalString "((lambda (x) x) y z)")
     message = "An unexpected error message was returned."
 
 testInvalidArgs :: Test
 testInvalidArgs = TestCase (assertEqual message expected actual)
   where
-    expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 17):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
+    expected = "Left \"Error at ((lambda (x) x) y z) (line 1, column 17):\\n\\tCould not evaluate function; expected 1 arguments, but got 2\""
     actual = show (evalString "((lambda (x) x) ((lambda (x) x) y z))")
     message = "An unexpected error message was returned."
 
@@ -180,28 +177,28 @@ testDiv = TestCase (assertEqual message expected actual)
 testAddLeftBool :: Test
 testAddLeftBool = TestCase (assertEqual message expected actual)
   where
-    expected = "Left \"Error at (+ #true 1) (line 1, column 1):\\n\\tCould not evaluate +, expected left argument to be an integer but got #true\""
+    expected = "Left \"Error at (+ #true 1) (line 1, column 1):\\n\\tCould not evaluate +; expected left argument to be an integer, but got #true\""
     actual = show (evalString "(+ #true 1)")
     message = "An unexpected error message was returned."
 
 testSubRightFvar :: Test
 testSubRightFvar = TestCase (assertEqual message expected actual)
   where
-    expected = "Left \"Error at (- 0 x) (line 1, column 1):\\n\\tCould not evaluate -, expected right argument to be an integer but got x\""
+    expected = "Left \"Error at (- 0 x) (line 1, column 1):\\n\\tCould not evaluate -; expected right argument to be an integer, but got x\""
     actual = show (evalString "(- 0 x)")
     message = "An unexpected error message was returned."
 
 testMulLeftError :: Test
 testMulLeftError = TestCase (assertEqual message expected actual)
   where
-    expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 4):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
+    expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 4):\\n\\tCould not evaluate function; expected 1 arguments, but got 2\""
     actual = show (evalString "(* ((lambda (x) x) x y) -1)")
     message = "An unexpected error message was returned."
 
 testDivRightError :: Test
 testDivRightError = TestCase (assertEqual message expected actual)
   where
-    expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 6):\\n\\tCould not evaluate function - expected 1 arguments, but got 2\""
+    expected = "Left \"Error at ((lambda (x) x) x y) (line 1, column 6):\\n\\tCould not evaluate function; expected 1 arguments, but got 2\""
     actual = show (evalString "(/ 2 ((lambda (x) x) x y))")
     message = "An unexpected error message was returned."
 
@@ -289,6 +286,7 @@ testEvalAnfStringComplexLambda = TestCase (assertEqual message expected actual)
     actual = show (evalAnfString "((lambda (x) (x x)) ((lambda (f) (f (f (lambda (y) y)))) (lambda (x) x)))")
     message = "Evaluation returned an unexpected value."
 
+tests :: Test
 tests =
   TestList
     [ TestLabel "testskk" testskk,
@@ -323,6 +321,7 @@ tests =
       TestLabel "testEvalAnfStringComplexLambda" testEvalAnfStringComplexLambda
     ]
 
+main :: IO b
 main = do
   result <- runTestTT tests
   if failures result > 0 then Exit.exitFailure else Exit.exitSuccess

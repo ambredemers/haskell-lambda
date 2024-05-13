@@ -3,18 +3,15 @@
 module Parser where
 
 import Control.Monad.Except
-import Control.Monad.Reader
 import Control.Monad.Trans.Either
 import Control.Monad.Trans.State.Strict
 import Data.Char
-import Data.Either.Extra
 import qualified Data.HashMap.Strict as Map
 import Data.List
 import Data.Maybe
 import Data.Maybe.HT
 import qualified Data.Text as Text
 import qualified Data.Tuple.Ops as TupleOps
-import Foreign.C (throwErrno)
 import Term
 import qualified Text.Regex as Regex
 
@@ -78,7 +75,7 @@ skipSpaces :: TokenizerType ()
 skipSpaces = do
   (input, index) <- get
   case Text.uncons input of
-    Just (head, tail) | isSpace head -> do put (tail, index + 1); skipSpaces
+    Just (x, xs) | isSpace x -> do put (xs, index + 1); skipSpaces
     _ -> return ()
 
 getToken :: TokenizerType (Maybe Token)
@@ -90,9 +87,9 @@ getToken = do
     Just (char, _) | isSpace char -> do skipSpaces; getToken
     _ -> do
       let (lexeme, rest) = Text.break (\char -> char == '(' || char == ')' || isSpace char) input
-      let length = Text.length lexeme
-      put (rest, index + length)
-      return $ toMaybe (length /= 0) (getTokenOfLexeme lexeme index)
+      let len = Text.length lexeme
+      put (rest, index + len)
+      return $ toMaybe (len /= 0) (getTokenOfLexeme lexeme index)
 
 tokenizeLoop :: TokenizerType [Token]
 tokenizeLoop = do
@@ -114,6 +111,7 @@ type ParserType = EitherT String (State ParserState)
 getVarName :: Term -> Text.Text
 getVarName (TermFvar name _) = name
 getVarName (TermBvar _ name _) = name
+getVarName _ = error "getVarName was called with a non-variable argument"
 
 parseError :: String -> ParserType a
 parseError expected = do
@@ -152,7 +150,7 @@ parseTerm = do
   ParserState tokens input <- lift get
   case tokens of
     TokVar _ _ : _ -> parseVar
-    TokBool value dbg : rest -> do setTokens rest; return $ TermBool True dbg
+    TokBool value dbg : rest -> do setTokens rest; return $ TermBool value dbg
     TokInt value dbg : rest -> do setTokens rest; return $ TermInt value dbg
     TokLparen (Dbg start _) : TokRparen (Dbg _ end) : rest -> do setTokens rest; return $ TermUnit (Dbg start end)
     TokLparen _ : TokLambda _ : _ -> parseLambda
@@ -170,7 +168,7 @@ parseTerms = do
   tokens <- getTokens
   case tokens of
     TokRparen _ : _ -> return []
-    _ -> do result <- parseTerm; tail <- parseTerms; return $ result : tail
+    _ -> do result <- parseTerm; rest <- parseTerms; return $ result : rest
 
 -- <var>
 parseVar :: ParserType Term
@@ -199,7 +197,7 @@ parseLambda = do
       setTokens rest
       vars <- parseVars
       let varNames = map getVarName vars
-      parseTokRparen
+      _ <- parseTokRparen
       body <- parseTerm
       TermAbs body [] varNames . Dbg start <$> parseTokRparen
     _ -> parseError "(lambda (<var>*) <term>)"
@@ -248,9 +246,9 @@ parseLetBindings = do
   tokens <- getTokens
   case tokens of
     TokLparen _ : _ -> do
-      head <- parseLetBinding
-      tail <- parseLetBindings
-      return $ head : tail
+      x <- parseLetBinding
+      xs <- parseLetBindings
+      return $ x : xs
     TokRparen _ : rest -> do setTokens rest; return []
     _ -> parseError "(<var> <term>)*)"
 
@@ -269,7 +267,7 @@ parseIf = do
 
 -- replace bound variables with indices
 localState :: ([Text.Text] -> [Text.Text]) -> State [Text.Text] Term -> State [Text.Text] Term
-localState f binder = do state <- get; modify f; result <- binder; put state; return result
+localState f binder = do s <- get; modify f; result <- binder; put s; return result
 
 bindVars :: Term -> State [Text.Text] Term
 bindVars fvar@(TermFvar name dbg) = do
@@ -277,15 +275,14 @@ bindVars fvar@(TermFvar name dbg) = do
   case elemIndex name context of
     Just index -> return $ TermBvar index name dbg
     _ -> return fvar
-bindVars abs@(TermAbs body _ varNames _) = do
+bindVars tAbs@(TermAbs body _ varNames _) = do
   body' <- localState (reverse varNames ++) (bindVars body)
-  return $ abs {tAbsBody = body'}
+  return $ tAbs {tAbsBody = body'}
 bindVars (TermApp fn args dbg) = do
   fn' <- bindVars fn
   args' <- bindVarsMap args
   return $ TermApp fn' args' dbg
 bindVars (TermLet letVals body dbg) = do
-  context <- get
   letVals' <- bindLetVals letVals
   body' <- bindVars body
   return $ TermLet letVals' body' dbg
@@ -304,7 +301,7 @@ bindVarsMap (term : rest) = do
 bindVarsMap [] = return []
 
 bindLetVals :: [LetBinding] -> State [Text.Text] [LetBinding]
-bindLetVals (letVal@(LetBinding value name dbg) : rest) = do
+bindLetVals (letVal@(LetBinding value name _) : rest) = do
   modify (name :)
   value' <- bindVars value
   rest' <- bindLetVals rest
@@ -314,8 +311,8 @@ bindLetVals [] = return []
 -- wrapper around pipeline
 parse :: Text.Text -> Either String Term
 parse input =
-  let (result, state) = runState (runEitherT parseTerm) (ParserState (tokenize input) input)
-   in case (result, state) of
+  let (result, s) = runState (runEitherT parseTerm) (ParserState (tokenize input) input)
+   in case (result, s) of
         (Right term, ParserState [] _) -> return $ evalState (bindVars term) []
-        (Left error, _) -> throwError error
+        (Left e, _) -> throwError e
         (_, ParserState (_ : _) _) -> throwError "Parsing error: unexpected input after term"

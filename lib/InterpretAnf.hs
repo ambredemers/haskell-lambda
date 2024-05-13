@@ -32,11 +32,10 @@ evalErrorExpected location expected actual = evalError location message
 
 evalAnfExp :: AnfExp -> AnfEvalType AnfVal
 evalAnfExp (AnfValue val) = evalAnfVal val
-evalAnfExp alet@(AnfLet value body _ _) = do
+evalAnfExp (AnfLet value body _ _) = do
   value' <- evalAnfVal value
   localContext (value' :) (evalAnfExp body)
-evalAnfExp (AnfLetApp fn args body name dbg) = do
-  AnfEvalContext _ input <- ask
+evalAnfExp (AnfLetApp fn args body _ dbg) = do
   fn' <- evalAnfVal fn
   args' <- evalAnfVals args
   result <- applyAnf fn' args' dbg
@@ -50,7 +49,7 @@ evalAnfExp (AnfIf cond cnsq alt dbg) = do
 
 evalAnfVal :: AnfVal -> AnfEvalType AnfVal
 evalAnfVal (AnfBvar index _ dbg) = do
-  AnfEvalContext stack input <- ask
+  AnfEvalContext stack _ <- ask
   if index < length stack
     then return $ stack !! index
     else evalError "bound variable" ("invalid index " ++ show index) dbg
@@ -80,25 +79,26 @@ intBinaryOps =
     ]
 
 applyAnf :: AnfVal -> [AnfVal] -> Dbg -> AnfEvalType AnfVal
-applyAnf abs@(AnfAbs body env vars _) args dbg
+applyAnf tAbs@(AnfAbs body env vars _) args dbg
   | length env + length args == length vars = localContext (\s -> reverse args ++ env ++ s) (evalAnfExp body)
-  | length env + length args < length vars = return $ abs {aAbsEnv = reverse args ++ env}
-  | otherwise = do AnfEvalContext _ input <- ask; evalErrorExpected "function" expectedArgs actualArgs dbg
+  | length env + length args < length vars = return $ tAbs {aAbsEnv = reverse args ++ env}
+  | otherwise = evalErrorExpected "function" expectedArgs actualArgs dbg
   where
     expectedArgs = show (length vars - length env) ++ " arguments"
     actualArgs = show $ length env + length args
-applyAnf intBinOp@(AnfFvar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
+applyAnf (AnfFvar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
   AnfEvalContext _ input <- ask
   l' <- evalAnfVal l
   r' <- evalAnfVal r
   case (l', r') of
     (AnfInt lVal (Dbg start _), AnfInt rVal (Dbg _ end)) ->
       (intBinaryOps Map.! opName) lVal rVal (Dbg start end)
-    (AnfInt _ _, rTerm) ->
-      let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected right argument to be an integer but got " ++ show rTerm
-       in throwError $ makeErrorString input dbg message
+    (AnfInt _ aiDbg, rTerm) -> evalErrorExpected (Text.unpack opName) "right argument to be an integer" (show rTerm) aiDbg
     (lTerm, AnfInt _ _) ->
       let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected left argument to be an integer but got " ++ show lTerm
+       in throwError $ makeErrorString input dbg message
+    (lTerm, rTerm) ->
+      let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected arguments to be integers but got " ++ show lTerm ++ " and " ++ show rTerm 
        in throwError $ makeErrorString input dbg message
 applyAnf term _ dbg = do
   AnfEvalContext _ input <- ask
@@ -106,11 +106,11 @@ applyAnf term _ dbg = do
   throwError $ makeErrorString input dbg message
 
 evalAnf :: AnfExp -> Text.Text -> Either String AnfVal
-evalAnf exp input =
-  runReader (runEitherT (evalAnfExp exp)) (AnfEvalContext [] input)
+evalAnf aExp input =
+  runReader (runEitherT (evalAnfExp aExp)) (AnfEvalContext [] input)
 
 -- evalString
 evalAnfString :: String -> Either String AnfVal
 evalAnfString input = do
-  exp <- parseToAnf (Text.pack input)
-  evalAnf exp (Text.pack input)
+  aExp <- parseToAnf (Text.pack input)
+  evalAnf aExp (Text.pack input)

@@ -14,11 +14,11 @@ getStringAtDbg :: Text.Text -> Dbg -> Text.Text
 getStringAtDbg input (Dbg start end) = Text.take (end - start) (Text.drop start input)
 
 makeErrorString :: Text.Text -> Dbg -> String -> String
-makeErrorString input dbg@(Dbg start end) message =
+makeErrorString input dbg@(Dbg start _) message =
   "Error at " ++ lexeme ++ " (line " ++ show (line + 1) ++ ", column " ++ show (column + 1) ++ "):\n\t" ++ message
   where
     lexeme = Text.unpack (getStringAtDbg input dbg)
-    (prefix, rest) = Text.splitAt start input
+    prefix = Text.take start input
     prefixLines = Text.lines prefix
     line = if null prefixLines then 0 else length prefixLines - 1
     lastline = if null prefixLines then Text.empty else last prefixLines
@@ -41,8 +41,8 @@ instance Show Term where
   show (TermFvar name _) = Text.unpack name
   show (TermBvar _ name _) = Text.unpack name
   show (TermAbs body [] varNames _) = "(lambda (" ++ Text.unpack (Text.unwords varNames) ++ ") " ++ show body ++ ")"
-  show abs@(TermAbs _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (abs {tAbsEnv = []}) ++ "))"
-  show tLet@(TermLet bindings body _) = "(let (" ++ unwords (map show bindings) ++ ") " ++ show body ++ ")"
+  show tAbs@(TermAbs _ env _ _) = "(closure (" ++ unwords (map show env) ++ ") (" ++ show (tAbs {tAbsEnv = []}) ++ "))"
+  show (TermLet bindings body _) = "(let (" ++ unwords (map show bindings) ++ ") " ++ show body ++ ")"
   show (TermApp fn args _) = "(" ++ show fn ++ foldl (\x y -> x ++ " " ++ show y) "" args ++ ")"
   show (TermBool True _) = "#true"
   show (TermBool False _) = "#false"

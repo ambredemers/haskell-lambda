@@ -35,7 +35,7 @@ instance Show AnfExp where
 
 instance Show AnfVal where
   show (AnfFvar name _) = Text.unpack name
-  show (AnfBvar index name _) = Text.unpack name
+  show (AnfBvar _ name _) = Text.unpack name
   show (AnfAbs body _ vars _) = "(lambda (" ++ Text.unpack (Text.unwords vars) ++ ") " ++ show body ++ ")"
   show (AnfBool True _) = "#true"
   show (AnfBool False _) = "#false"
@@ -81,7 +81,7 @@ lowerTermToAnfVal (TermIf cond cnsq alt dbg) = do
   (cond', binder) <- lowerTermToAnfVal cond
   cnsq' <- lowerTermToAnfExp cnsq
   alt' <- lowerTermToAnfExp alt
-  return (AnfFvar name dbg, \body -> binder $ AnfIf cond' cnsq' alt' dbg)
+  return (AnfFvar name dbg, \_ -> binder $ AnfIf cond' cnsq' alt' dbg)
 lowerTermToAnfVal (TermInt value dbg) = return (AnfInt value dbg, id)
 lowerTermToAnfVal (TermUnit dbg) = return (AnfUnit dbg, id)
 
@@ -103,7 +103,6 @@ lowerTermToAnfExp term = do (val, binder) <- lowerTermToAnfVal term; return $ bi
 bindAnfExpVars :: AnfExp -> Reader [Text.Text] AnfExp
 bindAnfExpVars (AnfValue val) = do val' <- bindAnfValVars val; return $ AnfValue val'
 bindAnfExpVars (AnfLet value body name dbg) = do
-  context <- ask
   value' <- bindAnfValVars value
   body' <- local (name :) (bindAnfExpVars body)
   return $ AnfLet value' body' name dbg
@@ -143,8 +142,8 @@ bindAnfValVarsMap [] = return []
 
 lowerTermToAnf :: Term -> AnfExp
 lowerTermToAnf term =
-  let exp = evalState (lowerTermToAnfExp term) Set.empty
-   in runReader (bindAnfExpVars exp) []
+  let aExp = evalState (lowerTermToAnfExp term) Set.empty
+   in runReader (bindAnfExpVars aExp) []
 
 parseToAnf :: Text.Text -> Either String AnfExp
 parseToAnf input = do
