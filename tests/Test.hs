@@ -9,11 +9,11 @@ import Term
 import Test.HUnit
 
 -- term building helper functions
-tFVar :: String -> Term
-tFVar name = TermFvar (Text.pack name) emptyDbg
+tFvar :: String -> Term
+tFvar name = TermFvar (Text.pack name) emptyDbg
 
-tBVar :: Int -> Term
-tBVar index = TermBvar index (Text.pack (show index)) emptyDbg
+tBvar :: Int -> Term
+tBvar index = TermBvar index (Text.pack (show index)) emptyDbg
 
 tAbs :: [String] -> Term -> Term
 tAbs vars body = TermAbs body [] (map Text.pack vars) emptyDbg
@@ -32,41 +32,41 @@ tIf cond cnsq alt = TermIf cond cnsq alt emptyDbg
 
 -- combinators
 s :: Term
-s = tAbs ["x", "y", "z"] (tApp (tApp (tBVar 2) [tBVar 0]) [tApp (tBVar 1) [tBVar 0]])
+s = tAbs ["x", "y", "z"] (tApp (tApp (tBvar 2) [tBvar 0]) [tApp (tBvar 1) [tBvar 0]])
 
 k :: Term
-k = tAbs ["x", "y"] (tBVar 1)
+k = tAbs ["x", "y"] (tBvar 1)
 
 i :: Term
-i = tAbs ["y"] (tBVar 0)
+i = tAbs ["y"] (tBvar 0)
 
 -- tests
 testskk :: Test
 testskk = TestCase (assertEqual message expected actual)
   where
-    expected = Right (tFVar "x") :: Either String Term
-    actual = eval (tApp (tApp (tApp s [k]) [k]) [tFVar "x"]) (Text.pack "")
+    expected = Right (tFvar "x") :: Either String Term
+    actual = eval (tApp (tApp (tApp s [k]) [k]) [tFvar "x"]) (Text.pack "")
     message = "testskk: evaluation returned an unexpected value."
 
 testi :: Test
 testi = TestCase (assertEqual message expected actual)
   where
-    expected = Right (tFVar "x") :: Either String Term
-    actual = eval (tApp i [tFVar "x"]) (Text.pack "")
+    expected = Right (tFvar "x") :: Either String Term
+    actual = eval (tApp i [tFvar "x"]) (Text.pack "")
     message = "testi: evaluation returned an unexpected value."
 
 testIfTrue :: Test
 testIfTrue = TestCase (assertEqual message expected actual)
   where
-    expected = Right (tFVar "x") :: Either String Term
-    actual = eval (tIf tTrue (tFVar "x") (tFVar "y")) (Text.pack "")
+    expected = Right (tFvar "x") :: Either String Term
+    actual = eval (tIf tTrue (tFvar "x") (tFvar "y")) (Text.pack "")
     message = "testIfTrue: evaluation returned an unexpected value."
 
 testIfFalse :: Test
 testIfFalse = TestCase (assertEqual message expected actual)
   where
-    expected = Right (tFVar "y") :: Either String Term
-    actual = eval (tIf tFalse (tFVar "x") (tFVar "y")) (Text.pack "")
+    expected = Right (tFvar "y") :: Either String Term
+    actual = eval (tIf tFalse (tFvar "x") (tFvar "y")) (Text.pack "")
     message = "testIfFalse: evaluation returned an unexpected value."
 
 testTokenize :: Test

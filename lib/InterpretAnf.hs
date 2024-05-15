@@ -87,19 +87,14 @@ applyAnf tAbs@(AnfAbs body env vars _) args dbg
     expectedArgs = show (length vars - length env) ++ " arguments"
     actualArgs = show $ length env + length args
 applyAnf (AnfFvar opName _) [l, r] dbg | Map.member opName intBinaryOps = do
-  AnfEvalContext _ input <- ask
   l' <- evalAnfVal l
   r' <- evalAnfVal r
+  let opNameText = "'" ++ Text.unpack opName ++ "'"
   case (l', r') of
-    (AnfInt lVal (Dbg start _), AnfInt rVal (Dbg _ end)) ->
-      (intBinaryOps Map.! opName) lVal rVal (Dbg start end)
-    (AnfInt _ aiDbg, rTerm) -> evalErrorExpected (Text.unpack opName) "right argument to be an integer" (show rTerm) aiDbg
-    (lTerm, AnfInt _ _) ->
-      let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected left argument to be an integer but got " ++ show lTerm
-       in throwError $ makeErrorString input dbg message
-    (lTerm, rTerm) ->
-      let message = "Could not evaluate " ++ Text.unpack opName ++ ", expected arguments to be integers but got " ++ show lTerm ++ " and " ++ show rTerm 
-       in throwError $ makeErrorString input dbg message
+    (AnfInt lVal (Dbg start _), AnfInt rVal (Dbg _ end)) -> (intBinaryOps Map.! opName) lVal rVal (Dbg start end)
+    (AnfInt _ aiDbg, rTerm) -> evalErrorExpected opNameText "right argument to be an integer" (show rTerm) aiDbg
+    (lTerm, AnfInt _ _) -> evalErrorExpected opNameText "left argument to be an integer" (show lTerm) dbg
+    (lTerm, rTerm) -> evalErrorExpected opNameText "arguments to be integers" (show lTerm ++ " and " ++ show rTerm) dbg
 applyAnf term _ dbg = do
   AnfEvalContext _ input <- ask
   let message = "Could not evaluate function - expected a lambda or primitive function but got " ++ show term

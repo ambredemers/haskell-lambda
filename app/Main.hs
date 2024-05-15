@@ -1,8 +1,8 @@
 module Main where
 
 import Control.Monad
-import InterpretTerm
 import InterpretAnf
+import InterpretTerm
 import System.IO
 
 main :: IO ()
